@@ -1,0 +1,2868 @@
+% \iffalse
+%
+% Copyright 2010 Stephen Hicks, All rights reserved.
+% marginfix.dtx - 14 Jun 2010
+% originally floatprobsbegone, created 21 Mar 2008
+%
+% Run LaTeX on this document to produce documentation.
+% Run LaTeX on marginfix.ins to produce the package.
+%<*driver>
+\ProvidesFile{marginfix.dtx}
+%</driver>
+%
+%<package>\NeedsTeXFormat{LaTeX2e}
+%<package>\ProvidesPackage{marginfix}%
+           [2010/06/14 v2.0 Fix Margin Paragraphs]
+%<*driver>
+\documentclass{ltxdoc}
+%\OnlyDescription % (un)comment this line to show (hide) source code
+\RecordChanges
+\EnableCrossrefs
+\CodelineIndex   % (un)comment this line to index source by page (line)
+\begin{document}
+  \newcommand*{\Lopt}[1]{\textsf {#1}}
+  \parindent0pt
+  \def\*#1{\texttt{\string#1}} %% sdh - |...| doesn't work in headings
+  \makeatletter
+  %
+  \newcount\mac@depth\mac@depth\z@
+  \newcommand\@macros{}\newcommand\@endmacros{}
+  \catcode`&3  %% we use a funny catcode to ensure never used.
+  \def\@macros#1,{\macro{#1}\global\advance\mac@depth\@ne\relax
+    \@ifnextchar&\@gobble\@macros}
+  \def\@endmacros{\let\mac@next\relax\ifnum\mac@depth>\z@
+    \endmacro\let\mac@next\@endmacros
+    \global\advance\mac@depth\m@ne\fi\mac@next}
+  \newenvironment{macros}[1]{\@macros#1,&}{\@endmacros}
+  \catcode`&4  %% put it back 
+  \makeatother %% must be balanced for character table to work properly
+  %
+  \DocInput{floatprobsbegone.dtx}
+  \setcounter{IndexColumns}{2}
+  \PrintIndex
+  \PrintChanges
+\end{document}
+%</driver>
+% \fi
+% \changes{v1.0}{2008/03/21}
+%       {(SDH) Initial version.}
+% \changes{v1.1}{2008/03/31}
+%       {(SDH) First completely-working version.}
+% \changes{v1.1.1}{2008/04/07}
+%       {(SDH) Add marginskip as complement to -sep and -shift.}
+% \changes{v1.2}{2008/06/02}
+%       {(SDH) Float page support, etc.}
+% \changes{v1.2.1}{2008/06/04}
+%       {(SDH) Work on tryfullwidth, integrate with float pages.}
+% \changes{v1.2.2}{2008/07/03}
+%       {(SDH) Many changes.}
+% \changes{v1.2.3}{2008/12/09}
+%       {(SDH) Fix a bug that cuased floats to get delayed.}
+% \changes{v2.0}{2010/06/14}
+%       {(SDH) Clean up for TUG: pull out float handling.}
+%
+% \GetFileInfo{marginfix.dtx}
+% \title{|marginfix| package documentation}
+% \author{Stephen Hicks}
+% \date{\fileversion{} -- \filedate}
+% \maketitle
+%
+% \part*{Usage}
+%
+% \section{Overview}
+% This package changes the bahavior of floats and marginpars.
+% The basic principle is to make the behavior simple, understandable,
+% and predictable, as outline in |floatprobsbegone.pdf|.  The basic
+% algorithm for placing marginpars involves a two-step
+% ``push down--crunch up'' approach, devised originally by
+% Andy Ruina, as follows:
+% \begin{enumerate}
+% \item Each box is inserted at its callout location, until right before
+%       the total height of insertions exceeds the column height.  Glue
+%       is inserted between boxes.
+% \item Starting from the top box, each box is pushed downward
+%       as needed to prevent intersections.
+% \item Starting from the bottom box, each box is pushed upward to fit
+%       on the page, deleting any glue necessary to fit.
+% \end{enumerate}
+% \section{Options}
+% \Lopt{debug} turns on a great deal of debugging output.
+%
+% \Lopt{showphantoms} will eventually put a black mark in the
+% margins in the place of all the phantoms, for more debugging
+% purposes.  For now, however, it just outputs debugging text
+% with the top/bottom positions of each.
+%
+% \section{Commands}
+% Most of this package works behind the scenes.  It makes use of a number
+% of \LaTeX{} dimension registers for controlling the float placement, such
+% as |\marginparpush| and |\floatsep|.  Will document this later.
+%
+% It also defines a few commands for special circumstances:
+% \begin{itemize}
+%   \item |\dumpfloats| requires that all the floats be output before
+%         any more text is processed.  The requirements for float pages
+%         are therefore greatly reduced.
+%   \item |\marginsep{LENGTH}| inserts a noncompressible space on the margin,
+%         similar to calling out a |\marginpar{\vskip LENGTH}|, but more
+%         efficient in several ways, including the fact that |\marginsep|s
+%         at the top of a page are ignored.
+%   \item |\marginskip{LENGTH}| inserts a skip box into the margin box,
+%         which allows boxes to intersect one another and is noncompressible.
+%   \item |\clearmargin| inserts a token onto the margin to prevent any
+%         more material from appearing on the same page.  These are cumulative.
+%   \item |\softclearmargin| inserts a large |\marginsep|, which practically
+%         acts like an idempotent (non-cumulative) |\clearmargin|.
+%   \item |\extendmargin{LENGTH}| extends the margin on the current page by
+%         |LENGTH|.
+%   \item |\inject{CODE}| is a tricky macro that injects a piece of code into
+%         the output routine.
+%   \item |\blockmargin| begins a region in which no marginal material may
+%         be placed, for the purpose of extra-wide floats, text, and equations.
+%         It may be called by |\blockmargin*| in which case a |\softclearmargin|
+%         is also inserted to discourage marginal notes from crossing this
+%         point.  |\unblockmargin| switches back to allowing marginal
+%         material.  These are implemented by breaking the total margin into
+%         smaller ``sub-margins'' and setting each one individually.  This has
+%         the unfortunate side-effect of clumping as many notes as possible
+%         in the first sub-margin, so |\blockmargin*| or |\softclearmargin|
+%         may be helpful in improving the typesetting.
+%   \item |\marginphantom{POS1}{POS2}| is an alternative to block/unblock
+%         in that it only calls the output routine once and thus doesn't risk
+%         having the two positions end up the same.  The two arguments are
+%         relative positions (+ is downward) for the top and bottom of the
+%         phantom block, respectively.  An example use is to put
+%         |\marginphantom{0in}{2in}| directly above an overfull piece of text,
+%         or |\marginphantom{-2in}{0in}| directly below it.  The latter is
+%         safer because the former may get delayed until afterwards anyway.
+% \end{itemize}
+%
+% \section{Interaction with other packages}
+% \subsection{morefloats}
+% Since we use the internal \LaTeX{} |\@freelist| and other float
+% lists, this package works as expected.
+%
+% \subsection{memoir}
+% As far as I know, this package behaves well with \Lopt{memoir}.  Several
+% choices were made specifically with memoir in mind.  In particular,
+% we have a |\sdh@fl@inline| macro that is |\def|'ed to either
+% margin or here and is designed to capture captions and labels from
+% macros generated by |\newfixedcaption| and its relatives.
+%
+% \subsection{mparhack}
+% The \Lopt{mparhack} package has been put forward as one solution to
+% a number of marginpar problems.  Its works by saving information (one
+% control sequence per page) to the DVI file, so that the marginpar routine
+% can figure out correctly which side to put the margin on.  Being a simple
+% workaround, it is much less invasive and therefore much less likely to be
+% broken by future versions of \LaTeX{}.  But it also doesn't fix as much;
+% for instance, it is unable to push earlier marginpars upward to make 
+% space for later marginpars that could possibly fit.  Because we don't
+% actually set the margin boxes until the output routine, this package
+% does not suffer from the problem that \Lopt{mparhack} was designed to
+% fix and it is therefore incompatible.
+%
+% \subsection{Multiple columns}
+% So far, multiple columns are not supported.  Attempts
+% to use this package while in double-column mode will result in undefined
+% behavior, and probably \LaTeX{} errors. 
+%
+% \section{Possible improvements}
+% \begin{itemize}
+% \item We could construct a third box (use reappropriate the second box)
+%       for margin notes that may be used in case the margin fills up as a
+%       full-width footnote instead.  This would take a lot of work.
+% \end{itemize}
+%
+% \StopEventually{}
+%
+% \makeatletter
+% \part*{Implementation}
+%
+% \section{Todo}
+% \begin{itemize}
+%   \item Fix documentation---details of float box flow
+%   \item Float pages, |\textfraction|, etc. !!!
+%   \item Margin phantoms from oversized floats
+%   \item Some way to call sidenotes from within boxes
+%   \item Perhaps implement a |\marginunskip| sort of thing that eats a glue
+%         (and/or skip) before it.
+%   \item To facilitate dealing with margin, maybe streamline objects that
+%         only act in either the build or bubble phases...?  or completely?
+%   \item Differentiate |\dumpmargin| from |\dumpfloats|?  Maybe not even
+%         clear the page so can combine?
+%   \item |\flushmargin| and |\raggedmargin|
+%   \item \Lopt{rpbook}'s |\broken@FigureC| had bad interactions with the
+%         new |\makeafterchapterbar|, presumably something related to the
+%         use of a free |\figcaption| before a |\blockmargin|.  Test with
+%         |\broken@FigureC{file}{cap}| followed by
+%         |\clearpage\makeafterchapterbar\dumpfloats|.
+%         Maybe just |\blockmargin| would get the job done...
+%   \item If we want to worry about the ordering then we'll need to do
+%         something to keep track of the correct order of top/bottom floats
+%   \item It would be nice to have arbitrary code to run to ask if a float
+%         can be placed somewhere, considering e.g. ordering, page parity,
+%         or anything else.
+%   \item Question about [b] vs. [bp] -- we don't want to have float pages
+%         when a could [b]'s will do.  How can we deal with that?  Maybe
+%         allow non-p?  That should be doable...  But really, we'd like to
+%         totally ditch the whole FPS thing in the first place!
+%   \item Currently we don't fix the widths on float pages, nor do we
+%         set phantoms - this shows up in |test.tex| if we change all the
+%         black boxes to be [p].  We would probably need to hack around
+%         |\@vtryfc| and |\@wtryfc| to do this.
+%   \item Maybe ordering can be done (for now) by putting in a 
+%         |\looseordering| command which clears the ftype bit in the fps
+%         and we can then put this into the macros defining figures.
+%         We could also allow, say, an ftype=0 to do the same?
+%         (does it already? yes)
+%   \item We could use actual skips for the margin notes...?  And then also
+%         have a |\marginunskip| command to simply remove the last skip from
+%         the list (maybe by reversing and removing the first one?)
+%   \item[!!!] Restore the float ordering code!!!
+% \end{itemize}
+%
+% Reasons we can lose a float:
+% \begin{itemize}
+%   \item |\ml@insert@run| never run to pull it off pending and curr
+%   \item we lose a float on p227, ch 4.3...?
+%         -> sidebar on 4.3 inside emphasize breaks...
+%   \item debugging: |\trackdownfloat| to trace spec.output -Miv and
+%         adds (and maybe some other info like the figure numbers...?
+%   \item this could  be a penalty -10005 or something, which we insert
+%         after each 10002/3 and make sure it got off pending...  we could
+%         keep a list of |\@elt{caption}|s? - obviously this won't work
+%         since we're missing an output call anyway...
+%   \item find a way to test when sidebar or sidenote will fail:
+%         -> experiment with shaded and adjustwidth; maybe examine
+%         latex's environment stack?  inner? hmode? penalty test??
+%         in hmode, a penalty will NOT call the OR..
+%   \item ALSO, mparshift is different sign...?
+% \end{itemize}
+%
+% \section{Initial Setup}
+% \begin{macros}{\xa,\@ight,\f@ur,\@C}
+% Make the |@|-sign into a letter for use in macro names.  As long as the
+% packages are well-behaved, we can put this here and not later.  We also
+% define |\xa| to be |\expandafter| for convenience.
+%    \begin{macrocode}
+%<*package>
+\makeatletter
+\let\xa\expandafter
+\chardef\@ight=8
+\chardef\f@ur=4
+\newcount\@C \@C=100
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{\sdh@debug,\sdh@debug@}
+% Define a default |\sdh@debug| that does nothing.  The |debug| option
+% resets this to |\sdh@debug@| which actually prints messages.
+%    \begin{macrocode}
+\def\sdh@debug{\@ifstar\@gobble\@gobble}
+\def\sdh@debug@{\@ifstar\message{\message{^^J***}\message}}
+\DeclareOption{debug}{\let\sdh@debug\sdh@debug@}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macro}{\ifsdh@showphantoms}
+% The |showphantom| options is implemented with a simple boolean,
+% though it currently doesn't actually \emph{do} anything.
+%    \begin{macrocode}
+\newif\ifsdh@showphantoms
+\DeclareOption{showphantoms}{\sdh@showphantomstrue}
+%    \end{macrocode}
+% \end{macro}
+% Now we process the options
+%    \begin{macrocode}
+\ProcessOptions\relax
+%    \end{macrocode}
+% We require the |inlinedef| package for a number of our definitions
+% to allow precisely in inserting our own code with minimal disturbance.
+%    \begin{macrocode}
+\RequirePackage{inlinedef}[2008/07/05]
+%    \end{macrocode}
+%
+% \section{Variable definitions}
+% \subsection{User parameters}
+% \begin{macros}{\@mparshift}
+% Shifts the next marginpar.
+%    \begin{macrocode}
+\newdimen\@mparshift \@mparshift\z@
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\marginparpush}
+% We also make use of the built-in \LaTeX{} parameters |\marginparpush|,
+% \ldots
+% \end{macros}
+%
+% \begin{macros}{\floatsperpage}
+% |\floatsperpage| is the maximum number of floats allowed on a page that
+% \emph{isn't} a dedicated float page.  I think \LaTeX{} already has this
+% under a different name?
+%    \begin{macrocode}
+\newcount\floatsperpage  %%% DEPRECATE
+\floatsperpage\@ne %? what's a good value?  Should we use sth else?
+%    \end{macrocode}
+% \end{macros}
+%
+% \subsection{Internal variables for margin notes}
+% \begin{macros}{\sdh@marginbox,\sdh@marginlist,%%
+%                \@marginheight,\@marspace,\@marboxspace,\@marginextend,%%
+%                \sdh@deadcycles}
+% Define a box, a toks, and several dimens.
+%    \begin{macrocode}
+\newbox\sdh@marginbox
+\newtoks\sdh@marginlist
+\newdimen\@marginheight
+\newdimen\@marspace
+\newdimen\@marboxspace % eventually this will be different from marspace,
+                       % once we get the ``bubbling'' algorithm
+\newdimen\@marginextend \@marginextend\z@ % one-time margin extensions
+\newcount\sdh@deadcycles
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\sdh@marginphatom,\sdh@marginblock}
+% This holds the location of regins of the page that should be clear of
+% margin material.  We use a list of pairs of dimens \@elt{{block}{unblock}}.
+% |\sdh@marginblock| simply records the last unclosed block.
+%    \begin{macrocode}
+\let\sdh@marginphantom\@empty
+\let\sdh@marginblock\relax
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{itemize}
+% \item use repel normally
+% \item intersect is separate command
+% \item also way to insert - vskip (i.e. marginskip)
+% \item also tightmargin (maybe not)
+% \item test blank page at end w/ margins
+% \item for marginphantom -> e.g. overflowing equation...
+% \item figure numbers: column and then margin
+% \end{itemize}
+%
+% \subsection{Internal variables for floats}
+%
+% \begin{macro}{\sdh@floatcounts}
+% This is a list to keep running counts of how many of each type
+% of float we've set, to determine the correct ordering.  Each
+% element is of the type
+% $$|\@elt{{<figure type>}{<number>}}|.$$
+%    \begin{macrocode}
+\let\sdh@floatcounts\@empty
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\sdh@fl@pending,\sdh@fl@here,\sdh@fl@top,%
+%                \sdh@fl@bottom,\sdh@fl@margin,\sdh@fl@defer,\sdh@fl@inline}
+% These are lists that we store float structures in.  Each
+% element has the type
+% $$|\@elt{{<figure type>}{<fps>}{<ufi list>}<box>}|.$$
+% Currently, |<fps>| is not used.  The |<ufi list>| will be
+% discussed later.  The final macro is actually an alias for (typically)
+% either |\sdh@fl@here| or |\sdh@fl@margin| and will be used so that an
+% inline |\figcaption| will end up in the right spot.  |\figcaption| will
+% need to set |\@captype| if it doesn't already.  |\sdh@fl@inline| is used
+% so that we can tell whether a float that's being added is going right
+% here (=|\sdh@fl@here|) or is a true float (=|\sdh@fl@pending|) and so
+% that we don't know where it will be.  The only reason the ``here'' floats
+% need to go on anywhere is so that we can get the numbering correct.
+%    \begin{macrocode}
+\let\sdh@fl@pending\@empty
+\let\sdh@fl@here\@empty
+\let\sdh@fl@top\@empty
+\let\sdh@fl@bottom\@empty
+\let\sdh@fl@margin\@empty
+\let\sdh@fl@defer\@empty
+\def\sdh@fl@inline{\sdh@fl@here}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\sdh@ufilist}
+% I'm not sure if we actually want to define this here, since it needs to
+% get reset anyway whenever we go into a floating body.  This holds the
+% UFI for the most recent float until it's pushed into one of the above lists.
+%    \begin{macrocode}
+\let\sdh@ufilist\@empty
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\sdh@afterpage,\AfterPage}
+% This is a token array used to do stuff after the page is set,
+% particularly ``undeferring'' floats.  Maybe we don't need somthing
+% quite so general, and should instead just make a list of floats
+% to undefer and make some other sort of flag to say that we need to.
+% We also define a simple macro to append stuff to this, although I'm
+% not sure how great an idea that is.
+%    \begin{macrocode}
+\newtoks\sdh@afterpage
+\def\AfterPage#1{\global\sdh@afterpage\xa{\the\sdh@afterpage#1}}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\ifsdh@floatfits,\ifsdh@floatpage,\ifsdh@floatbarrier,%
+%                \ifsdh@counterstepped}
+% Various and sundry conditionals to be used elsewhere.
+%    \begin{macrocode}
+\newif\ifsdh@floatfits
+\newif\ifsdh@floatpage
+\newif\ifsdh@floatbarrier\sdh@floatbarrierfalse
+\newif\ifsdh@counterstepped
+\newif\ifsdh@disorderfloat
+ % This clobbers original value... :-/
+ %\let\if@debug\undef\@gobble\fi % interesting problem - skip for now
+ %\newif\if@debug%\@gobbletwo\fi\fi\@gobble\fi
+
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\sdh@G@disorderedfloats,\sdh@floats@disordered@message,%
+%                \sdh@floats@disordered}
+% This is redefined to emit a warning message when float order changes.
+%    \begin{macrocode}
+\def\sdh@G@disorderedfloats{%
+  \global\let\sdh@floats@disordered\sdh@floats@disordered@message}
+\def\sdh@floats@disordered@message{%
+  \@latex@warning@no@line{There were floats out of order.
+    Rerun to fix figure numbers}}
+\def\sdh@floats@disordered{%
+  \global\let\sdh@G@disorderedfloats\sdh@floats@disordered@message
+}
+\AtEndDocument{\sdh@G@disorderedfloats}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\sdh@holdfloatnum}
+% |\sdh@holdfloatnum| is used by our replacement version of
+% |\refstepcounter| to keep track of \LaTeX's count while we
+% mess around with it.
+%    \begin{macrocode}
+\newcount\sdh@holdfloatnum
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\sdh@outputcode,\sdh@injectbox}
+% This is a token list that is used for getting arbitrary
+% code into the OR (without breaking everything else!).
+% The way this system works is by allocating two floats for
+% every injection.  We might want to optimize by only keeping
+% a single box, or maybe none by just assigning a particular
+% negative counter to a |\code@ins| and reading that off...
+% |\sdh@injectbox| simply stores the most recent float box
+% used for a code injection.  It must start out as |\relax|.
+%    \begin{macrocode}
+\newtoks\sdh@outputcode
+\let\sdh@injectbox\relax
+%    \end{macrocode}
+% \end{macros}
+%
+% \section{Overloading \TeX{} routines}
+%
+% \begin{macros}{\marginpar,\@xympar}
+% |\@xympar| is called by |\marginpar| via either |\@xmpar| or
+% |\@ympar|, depending on whether there's an optional argument.  The
+% result is to allocate two float boxes (|\@marbox| and |\@currbox|)
+% and push them onto |\@currlist| via the float routine.  These
+% counters will remain good.  We'll come in afterwards and add the box
+% numbers onto our own margin list.  Since the output routine gets
+% called very soon with penalty -1002 (or so), we'll catch it there
+% (in |\@addmarginpar|), taking them off of |\@currlist| and filling
+% in the page position.  We overload |\marginpar| just so that we can
+% empty the UFI list.  I also changed the order to |\sdh@addbox\sdh@old@xympar|
+% because we were having the problem that the repair operation would get
+% called out before the box went onto the list, thus leaving us with
+% a stray box on pending.
+%    \begin{macrocode}
+\Inline*\def\marginpar{\begingroup
+  \sdh@clearufilist
+  \ifinner
+    \sdh@error{Cannot call \protect\marginpar from an inner mode}\@eha
+    \aftergroup\@gobble % some semblance of graceful error?
+  \else
+    \global\let\sdh@ufilist\@empty
+    \aftergroup\marginpar
+  \fi
+\endgroup}
+
+\Inline*\def\@xympar{%
+  %\sdh@debug{xympar}%
+  \gdef\sdh@fl@inline{\sdh@fl@pending}%
+  \sdh@addbox\@xympar}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\sdh@addbox}
+% This routine takes the boxes |\@currbox| and |\@marbox| and puts a
+% |\ml@box| onto the |\sdh@marginlist|.  Since we don't know the page
+% position yet, we can't fill in the third parameter.  There are two
+% ways we can deal with the |\mparshift|, depending on whether we want
+% to allow marginpars to intersect or repel.  Repulsion will be the
+% default, intersection comes by 
+%    \begin{macrocode}
+\def\sdh@addbox{%
+  \begingroup
+    \sdh@debug{***adding a margin box: \@currbox/ \@marbox (shift \the\@mparshift)}%
+    \let\ml@boxpre@repair\relax\let\ml@insert\relax
+    \edef\@temp@{{\ml@insert\@currbox\@marbox{\ml@boxpre@repair{\the\@mparshift}}}}%
+    \global\@mparshift\z@
+    \marginsep{\the\marginparpush}% This is the easiest way to deal with pushing
+    \xa\sdh@cons\xa\sdh@marginlist\@temp@
+  \endgroup
+}
+%    \end{macrocode}
+% Note that we could add another command to do either\ldots or we
+% could make a macro |\shiftedsidenote[shift]{...}| that just puts in
+% the stupid shifts\ldots
+% \end{macro}
+%
+% \begin{macro}{\@addmarginpar}
+% (Clobbers \LaTeX's version)
+% This code lets |\marginpar| do its normal thing with the output routine
+% and then intercepts it in the final stages of typesetting.
+% Indeed, we \emph{want} to get things set in parboxes, and would rather not
+% do this ourselves\ldots\ but we also need the sep and clear to be
+% inserted in the \emph{correct order}\ldots
+%
+% This macro must do the following:
+% \begin{enumerate}
+% \item remove one more box from |\@currlist|
+% \item figure out which kind of margin we're in\ldots\ (not yet!)
+% \item free up the lists eventually (\emph{not here})
+% \item save information for |\mk@marginbox| to use later
+% \end{enumerate}
+%    \begin{macrocode}
+\def\@addmarginpar{%
+  \@next\@marbox\@currlist{}\sdh@bug
+  \begingroup
+    \sdh@debug{addmarginpar (running insert) \@marbox/\@currbox at \the\c@page:\the\@pageht}%
+    %\sdh@showlists
+    \let\ml@insert\ml@insert@run
+    \let\ml@box\ml@box@save
+    \let\ml@sep\ml@sep@save
+    \let\ml@clear\ml@clear@save
+    \sdh@runmarginlist
+    %\sdh@showlists
+  \endgroup
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\@whichmarginbox}
+% |\@whichmarginbox#1#2| takes two box numbers and copies one of them
+% into |\@tempboxa|, depending on even/odd page.  This routine needs
+% some work.  It was ripped from |\@addmarginpar| in the source in order
+% to mis-use the internal commands as hooks.  No other counters or
+% boxes are harmed.
+%    \begin{macrocode}
+\def\@whichmarginbox#1#2{ %%%%%% SUPERCEDED!
+  \@tempcnta\@ne
+  \if@twocolumn
+    \if@firstcolumn \@tempcnta\m@ne \fi
+  \else
+    \if@mparswitch
+      \ifodd\c@page \else\@tempcnta\m@ne \fi
+    \fi
+    \if@reversemargin \@tempcnta -\@tempcnta \fi
+  \fi
+  \ifnum\@tempcnta <\z@
+    \setbox\@tempboxa\copy#1%
+  \else
+    \setbox\@tempboxa\copy#2%
+  \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \section{Utility functions}
+% \begin{macro}{\sdh@addtovbox}
+% |\sdh@addtovbox#1#2| adds the content in |#2| to the vbox in |#1|.
+% The interlineskip is removed so that negative-height vboxes will work
+% properly (and not screw up our bookkeeping).
+%    \begin{macrocode}
+\def\sdh@addtovbox#1#2{\global\setbox#1\vbox{\unvbox#1\nointerlineskip#2}}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@free}
+% |\sdh@free#1| frees the box in |#1| by |\@cons|ing it onto |\@freelist|.
+%    \begin{macrocode}
+\def\sdh@free#1{\xa\@cons\xa\@freelist#1}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@advancespace}
+% |\sdh@advancespace#1#2| advances the dimension register |#1| by the
+% total height (plus depth) of box |#2|, and the push that gets put on
+% before the box (or not\ldots)
+%    \begin{macrocode}
+\def\sdh@advancespace#1#2{%
+  \global\advance#1\ht#2%
+  \global\advance#1\dp#2%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@cons}
+% |\sdh@cons#1#2| adds the tokens in |#2| to the token register |#1|.
+%    \begin{macrocode}
+\def\sdh@cons#1#2{%
+  %\begingroup\def\@temp@{#2}\sdh@debug{sdh@cons \meaning\@temp@}\endgroup
+  \global#1\xa{\the#1#2}}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@runmarginlist}
+% |\sdh@runmarginlist| clears out |\toks@|, runs the list |\sdh@marginlist|,
+% and then restores |\sdh@marginlist| from the new contents of |\toks@|.
+%    \begin{macrocode}
+\def\sdh@runmarginlist{%
+  \toks@{}\the\sdh@marginlist\global\sdh@marginlist\toks@
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\sdh@peek,\sdh@xpeek}
+% This is analogous to |\@next| except that it doesn't remove the first element.
+% |\sdh@peek#1#2#3#4| puts the first element of |#2| into |#1| and runs |#3|,
+% unless the list was empty in which case it runs |#4|.
+%    \begin{macrocode}
+\def\sdh@peek#1#2#3#4{\ifx#2\@empty #4\else
+   \expandafter\sdh@xpeek #2\@@#1#2#3\fi}
+%    \end{macrocode}
+%
+%    \begin{macrocode}
+\def\sdh@xpeek \@elt #1#2\@@#3#4{\gdef#3{#1}}
+%    \end{macrocode}
+% \end{macros}
+%
+% \section{Margin box building routines}
+% \begin{macro}{\mk@marginbox}
+% This should get marginheight from somewhere else...  we'd like to
+% be able to make arbitrary-sized margins so that we can write
+% |\blockmargin| and |\unblockmargin|.  These macros will simply
+% split the margin up into smaller sub-margins and thus guarantee
+% that the blocked area is empty.  The disadvantage is that we lose
+% the ability to bubble up through the blocked areas.  The solution
+% to this would be tedious and I'm not sure it's decidable.  Workarounds
+% include shifting the |\marginpar|s, or maybe defining a |\marginpar*|
+% that presets |\mparsep{-big}| before calling the |\marginpar| so that
+% it will want to be above the top of the margin box and will go as
+% high as needed, thus getting dealt with before the bubbling phase.
+% 5/31/08 SDH - this doesn't actually work since the |\ml@glue@bubble|s
+% get eaten by the phantom and then we lose the information about where
+% it was supposed to go.  Instead, we need to remember extra information.
+% This whole routine needs to be rewritten with the new plan...  I'll
+% also make a |\marginphantom{}{}| command to use a single insertion...
+% Maybe add option [showphantoms] to help with debugging by putting
+% a visible hrule in its place?  Sadly this isn't going to get finished
+% yet, so there will be a few hacks instead...
+%    \begin{macrocode}
+\def\mk@marginbox{%\begingroup
+  %\@marspace\z@
+  %\@marboxspace\z@
+  %% We use one conditional for this process:
+  %% \@tempswa ...
+  %% What are they for...?
+  \let\ml@box\ml@box@build
+  \let\ml@insert\ml@insert@save
+  \let\ml@sep\@gobble % Just for now -> first \ml@box fixes it
+  \let\ml@clear\ml@clear@build
+  %\showthe\sdh@marginlist
+  \sdh@debug{mk@marginbox: marginheight=\the\@marginheight}%
+  \@temptokena{}\sdh@runmarginlist
+  % for the last group of boxes on a page only, we want to maybe add a sep
+  % if there's extra unused space, for aesthetic reasons.
+  % THIS SHOULD BE OPTIONAL! (\flushmargin vs \raggedmargin?)
+  \if@tempswa \ifdim\ht\@outputbox<\@colroom
+    \xa\ml@sep@build\xa{\the\dimexpr\@colroom-\ht\@outputbox}%
+  \fi \fi
+  %\sdh@debug{marginheight: \the\@marginheight}%
+%    \end{macrocode}
+% At this point, we've one page worth of margin content in
+% |\@temptokena|, but it's backwards and there may be content
+% beneath the bottom of the page.  Here we go back through and
+% push boxes up if they are too low.  We clear |\toks@| as the
+% output list, run |\@temptokena| which pushes boxes and returns
+% a reversed output in |\toks@|, and then finally run |\toks@|
+% to build the box.  Since the up macros always get run after the
+% downs, we have the downs put the ups directly into the list, so
+% that we don't need to re-|\let| everybody again.
+%    \begin{macrocode}
+  %\showthe\@temptokena
+  \ml@bubble@setup
+  %\global\setbox\sdh@marginbox\vbox{\vskip-\marginparpush}%
+  \toks@{}\the\@temptokena
+  %\showthe\toks@
+  \global\setbox\sdh@marginbox\vbox{\unvbox\sdh@marginbox\the\toks@}
+% Finally, we fix the height.
+%    \begin{macrocode}
+  %\endgroup
+}
+
+\def\sdh@marginnext{%
+  \@next\@phantombounds\sdh@marginphantom{% should we check sanity of bounds?
+    \@tempswafalse % not last block
+    %\sdh@debug{ \@phantombounds}%
+    \xa\xa\xa\@marginheight\xa\@firstoftwo\@phantombounds
+    %\sdh@debug{MAKE SEGMENT^^J***marginheight: \the\@marginheight}%
+    \mk@marginbox
+    \@marspace\ht\sdh@marginbox % let's just ask...
+    \xa\@tempdima\xa\@secondoftwo\@phantombounds
+    %\sdh@debug*{, marspace: \the\@marspace, new start: \the\@tempdima}%
+    \@marboxspace\@tempdima
+    \advance\@tempdima-\@marspace % as far as we got
+    %\sdh@debug*{, gap: \the\@tempdima}%
+    \@marspace\@marboxspace % funny ordering...
+    \global\setbox\sdh@marginbox\vbox{\unvbox\sdh@marginbox\vskip\@tempdima}
+    \sdh@marginnext
+  }{%
+    \@tempswatrue % last block
+    \xa\global\xa\@marginheight\sdh@totalmarginheight
+    \mk@marginbox
+  }%
+}
+ % @@@ Need to check: if there's a pending blockmargin then we should
+ % act like the bottom of the page is the unblock, then replace the block
+ % at the top of the next page...!
+\def\sdh@buildmargin{% assembles margin material into \sdh@marginbox
+  \begingroup
+  %\traceon
+  %\showthe\sdh@marginlist
+  %\sdh@calculatephantoms
+  \sdh@sortphantoms
+  \sdh@showphantoms
+  %\@marginheight\ht\@outputbox
+  %%% CHECK THAT COLROOM RESPECTS [B] FLOATS!
+  % For now, we'll assume every box blocks...
+  \@marginheight\dimexpr\@colroom+\@marginextend\relax
+  \global\@marginextend\z@
+  \edef\sdh@totalmarginheight{\the\@marginheight}%
+  \@marspace\z@
+  \@marboxspace\z@ % start here...
+  \global\setbox\sdh@marginbox\vbox{}%
+  \sdh@marginnext
+  \global\let\sdh@marginphantom\@empty
+  %%%\mk@marginbox
+  %\@tempdima\ht\@outputbox
+  %\global\ht\sdh@marginbox\@tempdima
+  % now that we're done, we'll reset the #3 args to 0pt:
+  \global\let\ml@box\ml@box@cleared
+  \global\let\ml@insert\ml@insert@save
+  \global\let\ml@sep\ml@sep@save
+  \global\let\ml@clear\ml@clear@save
+  \sdh@runmarginlist % now \sdh@marginbox is loaded...
+  % Need to correct the height now...
+  %%%%%%%% @@@@@@@ IS THIS OKAY?!?!?!?!?
+  \ifdim\ht\sdh@marginbox>\textheight
+    \@tempdima\dimexpr\ht\sdh@marginbox+\dp\sdh@marginbox-\textheight\relax
+    \ht\sdh@marginbox\textheight
+    \dp\sdh@marginbox\@tempdima
+  \fi
+  %
+  \endgroup
+}
+\let\@shipout\shipout  % DEPRECATED?
+\Inline*\def\@combinefloats{%
+  %\sdh@debug{botlist: \meaning\@botlist}%
+  % This is called by \@makecol in the OR.
+  % Want to intercept right before combining floats from top/bottom into
+  % \@outputbox so that we can find out if any overflow into the margin...
+  %\sdh@calculatephantoms % for  now, just assume they conflict...
+  \begingroup
+  %\message{^^J===CF: \sdh@fl@bottom // \@botlist}%
+  \sdh@foreach\@botlist\sdh@tryfullwidth
+  \endgroup
+  \sdh@debug{@combinefloats}\sdh@showlists  
+  \sdh@combinemargin@i % sdh 5/18 why is this here - it seems to break things!
+  %%% \__/ this was here so that we could enlarge the page if needed, pushing
+  %%%    \ the [b] floats down some...
+  %\sdh@debug{toplist: \meaning\@toplist}%
+  \@combinefloats
+  % SDH 5/19/08 At this point I believe everything's added (including footnotes)
+  % so we are free to push stuff up...
+  %%% NEW CODE 6/5/08
+  \ifdim\ht\@outputbox<\@colht % I think we want to do this...
+ %%%%% \global\let\shipout\@shipout % DEBUG -> only shipout interesting pages
+    \setbox\@outputbox\vbox to\@colht{\unvbox\@outputbox\vskip-\lastskip}%
+ %   \ifnum\badness>\@C %%%%% \XXX% does this ever happen?????
+ %     \setbox\@outputbox\vbox to\@colht{\unvbox\@outputbox\vfil}% %???
+ %   \fi
+  \fi
+}
+\def\sdh@sortphantoms{\begingroup
+  % this is pretty primitive, but should make it at least workable...
+  % \if@tempswa is used here to note whether the lowest point was
+  %   a block or an unblock...
+  \dimen@-1\p@
+  \@tempswafalse % not blocking
+  \let\@temp@\@empty
+  \def\@elt##1{%
+    \xa\@tempdima\@firstoftwo##1%
+    \xa\@tempdimb\@secondoftwo##1%
+    \if@tempswa\else % not currently blocking
+      \ifnum\@tempdima>\dimen@
+        \@tempswatrue
+        \dimen@\@tempdima
+      \fi
+    \fi
+    \if@tempswa % currently blocking
+      \ifnum\@tempdimb>\dimen@
+        \@tempswafalse
+        \edef\@temp@@{{{{\the\dimen@}{\the\@tempdimb}}}}%
+        \xa\@cons\xa\@temp@\@temp@@%
+      \fi
+    \fi
+  }%
+  \sdh@marginphantom
+  \ifx\sdh@marginblock\relax
+    \edef\@temp@@{{{{\sdh@marginblock}{\the\textheight}}}}%
+    \xa\@cons\xa\@temp@\@temp@@%
+    \sdh@marginblock\z@\p@ % reset to top of new page
+  \else\if@tempswa
+    \edef\@temp@@{{{{\the\dimen@}{\the\textheight}}}}%
+    \xa\@cons\xa\@temp@\@temp@@%
+  \fi\fi
+  \let\sdh@marginphantom\@temp@
+  \endgroup
+}
+\def\sdh@calculatephantoms{\begingroup
+  % This routine is NOT currently used...
+  % IDEA: look at the float lists for [t] and [b] and figure out which
+  % are oversized - if any are oversized then insert a marginphantom to
+  % deal with it.
+  % Difficulty: we want to call this while the boxes still exist so that
+  % we can find out their sizes...  but widths probably can't be trusted,
+  % unless we can be really clever.  Maybe hook into the beginning of
+  % \@combinefloats (called near end of \@makecol)...  we could do
+  % \begingroup\sdh@foreach\sdh@fl@bottom\tryfullwidth\endgroup between.
+  % ... some of this stuff is slow - maybe have options to turn these
+  %     routines on/off?
+  \@tempdima\z@ % top of current box
+  \@tempdimb\z@ % bottom of current box
+  % Start with \sdh@fl@top...
+  \def\go##1##2##3##4{% all we need is dimens of 4
+    %\message{^^J======go{##1}{##2}{##3}{##4}}%
+    %\message{^^J======wd##4=\the\wd##4 cf ##2}%
+    \if@tempswa % currently blocking
+      \message{ -> blocking}%
+      \advance\@tempdimb\dimexpr\ht##4+\dp##4\relax%
+      \ifdim\wd##4>\columnwidth\else % this one fits
+        \message{ -> fits}%
+        \edef\@temp@{{{{\the\@tempdima}{\the\@tempdimb}}}}%
+        \xa\@cons\xa\newphants\@temp@
+        \@tempswafalse
+      \fi
+    \else % not blocking
+      \message{ -> not blocking}%
+      \message{ (\the\wd##4)}%
+      \ifdim\wd##4>\columnwidth % but this one doesn't fit
+        \message{ -> too big}%
+        \@tempdima\@tempdimb
+        \@tempswatrue
+      %\else\message{^^J======\the\wd##4 < \the\columnwidth}%
+      \fi
+      \advance\@tempdimb\dimexpr\ht##4+\dp##4\relax%
+    \fi
+    \advance\@tempdimb\floatsep
+  }
+  % This code to be tested when I implement [t] floats!
+ %%   \let\newphants\@empty
+ %%   \@tempswafalse % not blocking initially...
+ %%   \sdh@foreach\sdh@fl@top\go
+ %%   \advance\@tempdimb-\floatsep % take off last floatsep
+ %%   % (do we add \textfloatsep yet?)
+ %%   \if@tempswa % still blocking
+ %%     \edef\@temp@{{{{\the\@tempdima}{\the\@tempdimb}}}}%
+ %%     \xa\@cons\xa\newphants\@temp@
+ %%   \fi
+ %%   \advance\@tempdimb\textfloatsep
+ %%   \sdh@cat\sdh@marginphantom:=\newphants\sdh@marhinphantom
+  % Now go through entire margin and add \@tempdimb to EVERYTHING
+  % including box positions and current phantoms...  how?
+  \advance\@tempdimb\ht\@outputbox % \@pageht? \@colroom?
+  %\message{^^J===: \the\@pageht // \the\ht\@outputbox // \the\@colroom}%
+  \advance\@tempdimb\textfloatsep
+  %
+  \let\newphants\@empty
+  \@tempswafalse
+  \sdh@foreach\sdh@fl@bottom\go
+  \advance\@tempdimb-\floatsep
+  \if@tempswa % still blocking
+    \edef\@temp@{{{{\the\@tempdima}{\the\@tempdimb}}}}%
+    \xa\@cons\xa\newphants\@temp@
+  \fi
+  \ifx\newphants\@empty
+    %\message{^^J===NO NEW PHANTOMS ADDED}%
+  \else
+    %\message{^^J===NEW PHANTOMS ADDED: \newphants}%
+  \fi  
+  \sdh@cat\sdh@marginphantom:=\sdh@marginphantom\newphants
+  \endgroup
+  %\message{^^J=== -> \sdh@marginphantom}%
+}
+\def\sdh@showphantoms{%
+  \begingroup
+  \ifx\sdh@marginphantom\@empty
+    \sdh@debug{No phantoms on page \the\c@page}%
+  \else
+    \sdh@debug{Phantoms on page \the\c@page:}%
+    \def\@elt##1{\sdh@debug{\@firstoftwo##1 - \@secondoftwo##1}}%
+    \sdh@marginphantom
+  \fi
+  \endgroup
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \section{Margin list routines}
+% We put various tokens into |\sdh@marginlist|.  These are the tokens:
+% \begin{itemize}
+%   \item |\ml@box#1#2#3| $\to$ pair of box numbers (left/right) and a position
+%   \item |\ml@boxpre#1#2#3| $\to$ an |\ml@box| before it's been repaired
+%   \item |\ml@clear| $\to$ clears margin
+%   \item |\ml@sep#1| $\to$ dimen (needs to be identifiable to remove at top)
+% \end{itemize}
+%
+% \begin{macros}{\ml@box,\ml@clear,\ml@sep}
+% We start with empty definitions.
+%    \begin{macrocode}
+\def\ml@box#1#2#3{\sdh@bug}
+\def\ml@insert#1#2#3{\sdh@bug}
+\def\ml@clear{\sdh@bug}
+\def\ml@sep#1{\sdh@bug}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\ml@box@build,\ml@sep@build,%%
+%                \ml@clear@build,\sdh@marginfull}
+% We keep track of where we are in |\@marspace|, and of the total
+% box sizes (plus padding) in |\@marboxspace|, which is the minimum
+% length of size the margin can be and tells us when we are full.
+% This is where we need to put in the bubbling-up code.
+%    \begin{macrocode}
+\def\sdh@marginfull{%
+  \global\let\ml@box\ml@box@save %%%@cleared
+  \global\let\ml@insert\ml@insert@save
+  \global\let\ml@sep\ml@sep@save
+  \global\let\ml@clear\ml@clear@save
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\ml@box@build,\ml@sep@build,\sdh@cons@backward,%%
+%                \@whichmarginbox@down}
+% First stage of two-stage building.  There's a lot going on here.  We'll
+% need to properly document it at some point.
+%    \begin{macrocode}
+\def\ml@box@build#1#2#3{%
+  \sdh@debug{#1--#2: #3}%
+  \let\ml@sep\ml@sep@build
+  \ifdim\@marspace<#3\relax
+    \@tempdima#3\relax
+    \advance\@tempdima-\@marspace
+    \sdh@debug{Adding \the\@tempdima\space padding to margin}%
+    \global\advance\@marspace\@tempdima
+    \xa\sdh@cons@backward\xa\@temptokena\xa
+        {\xa\ml@glue@bubble\xa{\the\@tempdima}}%
+  \fi
+  \@whichmarginbox#1#2%
+  %\setbox\count@\hbox{#3: #1---#2}%
+  \dimen@\dimexpr(\ht\@marbox+\dp\@marbox)\relax
+  \sdh@debug*{--> \the\dimen@}%
+  \advance\@marspace\dimen@
+  \advance\@marboxspace\dimen@
+  \ifdim\@marboxspace > \@marginheight % too big
+    % We might want to see if the box is >\textheight and issue an error
+    % We might also want to wait a page or two in case of \extendmargin
+    \global\advance\@marspace\dimexpr-\dp\@marbox-\ht\@marbox\relax
+    \sdh@marginfull
+    \ml@box@save#1#2{#3}% changed from 0pt - we'll do that later...
+  \else
+    \xa\sdh@cons@backward\xa\@temptokena\xa{\xa\ml@box@bubble\@marbox}%
+    \sdh@debug{Building box #1/ #2}%
+    % We need to move this box from pending to margin list -> #2=\@currbox
+    %\sdh@debug{BOX@BUILD:}%
+    %\sdh@debug{pending: \sdh@fl@pending^^J***here: \sdh@fl@here}%
+    %\sdh@debug{defer: \sdh@fl@defer^^J***margin: \sdh@fl@margin^^J}%
+    \sdh@move#1\sdh@fl@pending\sdh@fl@margin
+    %\sdh@addtovbox\sdh@marginbox{\box\@tempboxa}%
+    \sdh@free#1\sdh@free#2%
+  \fi
+}
+
+\def\ml@sep@build#1{%
+  \global\advance\@marspace#1\relax
+  \global\advance\@marboxspace#1\relax
+  \ifdim\@marboxspace > \@marginheight
+    \global\advance\@marspace-#1\relax
+    \global\advance\@marboxspace-#1\relax
+    %\ml@sep@save{#1}% shouldn't matter - will get erased.
+    \sdh@marginfull
+  \else
+    \sdh@cons@backward\@temptokena{\ml@sep@bubble{#1}}%
+  \fi
+}
+
+\def\ml@clear@build{%
+  \if@tempswa\else % there's more blocks coming...
+    \ml@clear@save % save this so the next block clears too
+    \global\let\sdh@marginphantom\@empty % skip remaining parts
+  \fi
+  \sdh@marginfull
+  %\sdh@debug{TOKS: \the\toks@^^J***TEMPTOKSA: \the\@temptokena}%
+  %\sdh@debug{MARGINLIST: \the\sdh@marginlist}%
+}
+  % prepends #2 onto #1
+\def\sdh@cons@backward#1#2{%
+  \begingroup\def\@temp@{#2}%
+  \global#1\xa\xa\xa{\xa\@temp@\the#1}\endgroup
+}
+
+\def\@whichmarginbox#1#2{
+  % returns correct box in \@marbox
+  % We can't destroy either since we're not sure it'll fit yet
+  \@tempcnta\@ne
+  \if@twocolumn
+    \if@firstcolumn \@tempcnta\m@ne \fi
+  \else
+    \if@mparswitch
+      \ifodd\c@page \else\@tempcnta\m@ne \fi
+    \fi
+    \if@reversemargin \@tempcnta -\@tempcnta \fi
+  \fi
+  \ifnum\@tempcnta <\z@ \def\@marbox{#1}\else \def\@marbox{#2}\fi
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\ml@box@build@up,\ml@sep@build@up,\ml@glue@build@up}
+% Phase 2: reverse and remove any glue necessary to fit.  Fill
+% |\toks@| with actual box and skip macros.  The plan: use |\@marspace|
+% to push the first box up if necessary, then store any pushing in
+% |\@marboxspace|, removing it from glue when needed.
+%    \begin{macrocode}
+\def\ml@bubble@setup{%
+  \global\@marboxspace\z@ % reuse for extra space
+  \ifdim\@marspace>\@marginheight
+    \global\@marboxspace\@marspace
+    \global\advance\@marboxspace-\@marginheight
+  \fi
+}
+\def\ml@box@bubble#1{% NOTE the fewer arguments
+  \sdh@cons@backward\toks@{\nointerlineskip\box#1\nointerlineskip}%
+}
+\def\ml@sep@bubble#1{%
+  \sdh@cons@backward\toks@{\vskip#1}%
+}
+\def\ml@glue@bubble#1{%
+  \ifdim\@marboxspace>\z@
+    \ifdim\@marboxspace>#1\relax
+      \global\advance\@marboxspace-#1\relax
+    \else
+      \@tempdima#1\relax
+      \advance\@tempdima-\@marboxspace
+      \xa\sdh@cons@backward\xa\toks@\xa{\xa\vskip\the\@tempdima}%
+      \global\@marboxspace\z@
+    \fi
+  \else
+    \sdh@cons@backward\toks@{\vskip#1}%
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\ml@box@repair}
+% |\ml@box@repair| compares |#1| with |\@marbox| and if they're the same,
+% it adds the current page position (|\@pageht|) to the box's position.
+% In either case, it behaves like a ``save'' macro.  We no longer need
+% the silly |\marginshift| kludge, since we discovered that |\@pageht| is
+% at the \emph{bottom} of the line and we want the position to be at the
+% top.  This includes the interline skip, so for normal font sizes,
+% baselineskip is correct.  On the other hand, for larger boxes, it's
+% not quite right and we might rather use the |\lastbox| to figure out
+% how much higher to put things...  \LaTeX\ evidently uses |\baselineskip|.
+%
+% HACK! this is a way to get arbitrary code into the OR...
+% we'll set |#3| to |\ml@code{...}| or |\ml@skip{...}| and then run it
+%    \begin{macrocode}
+\def\ml@boxpre@repair#1{%
+  \sdh@debug{Repairing box: \@marbox, shift #1}%
+  \@tempdima\dimexpr#1+\@pageht-\baselineskip
+  \sdh@debug*{ => \the\@tempdima}
+  \begingroup
+    \edef\@temp@{\@marbox\@currbox{\the\@tempdima}}%
+    \xa\sdh@cons\xa\toks@\xa{\xa\ml@box\@temp@}%
+  \endgroup
+  %\let\ml@code\ml@code@repair\let\ml@skip\ml@skip@repair
+}
+
+\def\ml@insert@run#1#2#3{% #3=code, #1,#2=boxes to free
+  %\sdh@debug{Checking to run insert #1#2 (looking for \@marbox\@currbox)}%
+  \ifnum#1=\the\@marbox\sdh@debug*{ => PASS}%
+    #3%\sdh@free#2\sdh@free#3% don't free here!!!
+  \else
+    \sdh@cons\toks@{\ml@insert#1#2{#3}}
+  \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\ml@box@save,\ml@sep@save,\ml@clear@save,\ml@box@cleared}
+% These macros just push the token onto |\toks@|.
+%    \begin{macrocode}
+\def\ml@box@save#1#2#3{\sdh@cons\toks@{\ml@box{#1}{#2}{#3}}}
+ % We put an \sdh@marginfull here b/c if it all runs before the box
+ % is repaired, we need to make sure the sep's get saved.
+\def\ml@insert@save#1#2#3{\sdh@marginfull\sdh@cons\toks@{\ml@insert#1#2{#3}}}
+\def\ml@sep@save#1{\sdh@debug{saving sep #1}\sdh@cons\toks@{\ml@sep{#1}}}
+\def\ml@clear@save{\sdh@cons\toks@\ml@clear}
+ %\let\ml@box@cleared\ml@box@save % we'll reset it later
+\def\ml@box@cleared#1#2#3{\ml@box@save{#1}{#2}{0pt}}
+%    \end{macrocode}
+% \end{macros}
+%
+% \section{Barriers}
+% \begin{macros}{\dumpfloats,\sdh@deadcycle,\sdh@countall}
+% This macro is a serious mess.  Basically we need it to do the following:
+% \begin{itemize}
+% \item it will be called possibly in the middle of a page.  If that is the
+%       case, we need to ship out that page ASAP.
+% \item all unplaced margin notes and floats need to get dumped.
+% \end{itemize}
+% Any floats and margin notes that can fit on the current page should
+% already have been placed (note that margin notes don't get placed until
+% the OR, but that's okay).  The exception to this is if we have e.g. not 
+% much text and two small floats and only allow one float per page.
+% If we wanted to be more like a float page, but with a little text,
+% then maybe we should reconsider.  Otherwise, it's just time to clear the
+% page and move on.  Should it be possible to call |\dumpfloats| without
+% clearing the page?
+% Also, we don't want to generate a bunch of blank pages...
+%
+% I might put in two more lists to keep track of (a) the order that
+% floats were called out, and (b) the order of strictly-ordered floats,
+% and then here maybe we put them all into the p-type float list
+% For now, we're just gonna dump t,h,b,p together here...
+% --- it would be nice to get this into a group so that |\@fpmin| is restored
+% properly...  is there anything else we could do to get that effect?
+% (somebody here doesn't like being in a group... who?)
+%    \begin{macrocode}
+ % Clearpage is supposed to dump floats
+ % If it's called explicitly in the middle of a page on which we've decided to
+ % put a [b] float, then \@doclearpage gets ahold of it and defers it with
+ % LaTeX's deferlist.  But we don't want that to happen, so we have to hijack
+ % the clearpage and make sure we dump our own floats FIRST!
+\let\sdh@clearpage\clearpage
+\def\clearpage{\dumpfloats\sdh@clearpage}
+\def\dumpfloats{%
+  \global\sdh@deadcycles\z@
+  \sdh@floatbarriertrue
+  \sdh@clearpage
+  \begingroup % move everything back to defer list
+    % If there's anything left here, it's probably a bug!
+    %\@testfalse
+    %\def\@elt##1{\@testtrue}%
+    %\sdh@fl@top\sdh@fl@here\sdh@fl@bottom
+    %\if@test
+    %  \sdh@error{dumpfloats: clearpage didn't do its job with ##1}\@eha
+    %\fi
+    % DID WE LOSE ANYTHING?
+    % But otherwise move stuff (this code here shouldn't be needed...!)
+    \let\@elt\relax
+    \xdef\sdh@fl@defer{\sdh@fl@top\sdh@fl@here\sdh@fl@bottom\sdh@fl@defer}%
+    \global\let\sdh@fl@top\@empty\global\let\sdh@fl@here\@empty
+    \global\let\sdh@fl@bottom\@empty
+  \endgroup
+  \sdh@countall
+  \ifsdh@floatbarrier\else\sdh@debug{dumpfloats: nothing to dump!}\fi
+  \@whilesw\ifsdh@floatbarrier\fi{%
+    \sdh@debug{dumpfloats: \the\sdh@deadcycles}
+    \vfill\filbreak\sdh@clearpage\sdh@countall
+    \sdh@deadcycle
+}}
+%    \end{macrocode}
+% We need to run |\dumpfloats| at the end of the document.
+%    \begin{macrocode}
+\AtEndDocument{\dumpfloats}
+%    \end{macrocode}
+% This is a cleanly encapsulated routine to increment the
+% deadcycles and issue an error when there are too many.
+%    \begin{macrocode}
+\def\sdh@deadcycle{%
+  \advance\sdh@deadcycles\@ne
+  \ifnum\sdh@deadcycles>\sixt@@n
+    \sdh@showlists
+    \sdh@error{Can't seem to dump all the floats}\@eha
+    \global\sdh@fl@pending\@empty %%% this is probably as graceful as we can be?
+  \fi
+}
+%    \end{macrocode}
+% Finally, here's some code to count the pending floats and
+% margin boxes.  If there are any floats left, it sets
+% |\sdh@floatbarriertrue|.  It all the floats are margin boxes
+% then in order for |\clearpage| to be successful we need to
+% actually output something: the simplest thing is a box with
+% the dimensions of the page, so we do that if there are only
+% margin boxes left.  Note that for a while I had |\sdh@fl@margin|
+% in place of |\sdh@fl@pending|, but I believe this is now correct
+% since |\sdh@fl@margin| is for margin boxes that have \emph{already}
+% been set, and pending is for the ones that haven't been.
+%    \begin{macrocode}
+\def\sdh@countall{%
+  \sdh@floatbarrierfalse
+  \begingroup
+    % First count the floats
+    \sdh@debug{Counting floats}%
+    \def\@elt##1{\advance\count@\@ne}%
+    \count@\z@                  % At this point, we've manually emptied others
+    \sdh@fl@defer\sdh@fl@margin\sdh@fl@pending % probably don't want all these
+    % Check if we had any
+    \sdh@debug*{-> \the\count@}%
+    \ifnum\count@>\z@\global\sdh@floatbarriertrue\fi
+    % Now count the margin notes
+    \def\ml@box##1##2##3{\advance\count@\m@ne}%
+    \let\ml@boxpre\ml@box
+    \let\ml@sep\@gobble\let\ml@clear\relax
+    \the\sdh@marginlist
+    % If all the floats are marginal than output a box
+    \ifnum\count@=\z@\ifsdh@floatbarrier
+      \sdh@debug*{-> all marginal}%
+      \setbox\z@\vbox{}\ht\z@\@colht\wd\z@\textwidth\box\z@
+    \else\sdh@debug*{-> \the\count@ non-marginal}%
+    \fi\fi
+  \endgroup
+  \sdh@showlists
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \section{User macros}
+% \begin{macro}{\mparshift}
+% Just sets the internal dimen register; will be reset at the end of the
+% next marginbox.
+\newcommand\mparshift[1]{%
+  \@mparshift#1%
+}
+% \end{macro}
+%
+% \begin{macro}{\marginsep}
+% Add a |\ml@sep| token to the list.
+% We could pass in |\marginsep{\the\dimena}| if we wanted to\ldots?
+% Instead we're expanding it here.
+%    \begin{macrocode}
+\def\marginsep#1{\begingroup
+  \edef\@temp@{{#1}}% length gets expanded immediately...
+  \xa\sdh@cons\xa\sdh@marginlist\xa{\xa\ml@sep\@temp@}\endgroup
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\marginskip}
+% Add a vbox with the given height to the margin.
+%    \begin{macrocode}
+\def\marginskip#1{\marginpar{\vbox{\vskip #1}}}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\clearmargin,\softclearmargin}
+% |\clearmargin| clears the rest of the margin on a page and is cumulative.
+% |\softclearmargin| inserts a large |\marginsep| and so accomplishes the
+% same thing, but plays well with |\blockmargin|.
+%    \begin{macrocode}
+\def\clearmargin{\sdh@cons\sdh@marginlist\ml@clear}
+\def\softclearmargin{\marginsep{\the\textheight}}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\extendmargin}
+% This command extends the length of the current margin by its argument.
+% It's useful if marginboxes are falling off the page and you want them back.
+%    \begin{macrocode}
+\def\extendmargin#1{\advance\@marginextend#1\relax}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\inject}
+% This macro hijacks the margin system to inject code into the output routine.
+% Currently this is very wasteful of boxes and only works in hmode.  Later,
+% we will (a) use a switch to tell |\@xympar| to be more economical by using
+% a custom insert and changing the count on it, and also to use a float instead
+% of a margin note so that it works in vmode as well.
+%    \begin{macrocode}
+\def\inject#1{%
+ % \ifvmode \sdh@warning{\string\inject\space should not be used in %
+ %   vertical mode mode: extra spaces may result}%
+ %   \leavevmode
+ % \fi
+  \ifinner \sdh@error{\string\inject\space can only be used in %
+        unrestricted horizontal mode}\@eha%
+  \else
+    \begingroup
+      \edef\temp@{\the\sdh@outputcode}% could also check \sdh@injectbox?
+      \ifx\temp@\@empty
+        \ifx\sdh@injectbox\relax\else\sdh@error{Injection lost}\@eha\fi
+        \global\sdh@outputcode{#1}%
+        \sdh@peek\sdh@injectbox\@freelist\relax\relax % if empty then float dies
+        % We could alternately insert our OWN insertion onto freelist...
+        \begin{figure}[p]\end{figure}%
+      \else
+        \sdh@warning{Injections colliding on page \the\c@page}%
+        \global\sdh@outputcode\xa{\the\sdh@outputcode#1}%
+      \fi
+    \endgroup
+    %\penalty-10005%\@Mv\penalty-\@Miv
+    %\marginpar{}%
+  \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\flushfloat}
+% This is a strange macro that probably shouldn't exist.  Its entire
+% job is to prevent errors when we lose a float by calling it out in
+% an inner mode.  So it's basically a quick and dirty (and ugly) fix
+% to \LaTeX's ``float lost'' error message, which it does by calling
+% the output routine to deal with a float that's stuck.
+%     \begin{macrocode}
+\def\flushfloat{% % check hmode...
+  \penalty-\@Miv\vbox{}\penalty-\@Miii
+}
+%     \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\AllowDisorderedFloat}
+% This is a macro to change a float type's |ftype| to zero so that
+% it is always allowed to be rearranged.  We will also have a macro
+% |\thisfloatdisordered| to do it on a float-by-float basis.
+% This should probably be robust and outer?
+%    \begin{macrocode}
+\outer\def\AllowDisorderedFloat#1{%
+  \xa\gdef\csname ftype@#1\endcsname{0}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\blockmargin,\blockmargin*,\unblockmargin}
+% These commands tell us not to put any margin material between them.
+% We also have a |\blockmargin*| version that prevents any margin notes
+% from creeping up past the block.
+%    \begin{macrocode}
+\def\blockmargin{%
+  \sdh@debug{blockmargin}%
+  \inject{%
+    \sdh@debug{OR: blockmargin}%
+    \ifx\sdh@marginblock\relax
+      \xdef\sdh@marginblock{\the\@pageht}%
+      \sdh@debug{Blocking margin: \meaning\sdh@marginblock}%
+    \else\sdh@error{Extra \string\blockmargin}\@eha\fi
+  }%
+  \@ifstar\softclearmargin\relax
+}
+
+\def\unblockmargin{%
+  \sdh@debug{unblockmargin}%
+  \inject{%
+    \sdh@debug{OR: unblockmargin}%
+    \ifx\sdh@marginblock\relax
+      \sdh@error{\string\unblockmargin\space without \string\blockmargin}\@eha%
+    \else
+      \begingroup
+        \ifdim\sdh@marginblock<\the\@pageht
+          \edef\@temp@{{{{\sdh@marginblock}{\the\@pageht}}}}%
+          \xa\@cons\xa\sdh@marginphantom\@temp@
+        \else
+          \sdh@debug{nonsense phantom supressed}%
+        \fi
+      \endgroup
+      \sdh@debug{Unblocking margin: \meaning\sdh@marginphantom}%
+    \fi
+    \global\let\sdh@marginblock\relax
+  }%
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\marginphantom}
+% The previous macros don't always work well if the injection gets
+% delayed, since the |\blockmargin| and |\unblockmargin| can end up
+% on top of each other.  This prevents that problem but gives up
+% accuracy by only calling the output routine at one end or the other.
+% So we can instead just take a guess at how much space we want to block
+% and call this before or after the overflowing material.
+%    \begin{macrocode}
+\def\marginphantom#1#2{%
+  \sdh@debug{marginphantom(#1)(#2)}%
+  \inject{%
+    \sdh@debug{OR: marginphantom(#1)(#2)}%
+    \begingroup
+      \edef\@temp@{{%
+          {{\the\dimexpr\@pageht+#1}{\the\dimexpr(@pageht+#2}}%
+      }}\xa\@cons\xa\sdh@marginphantom\@temp@
+    \endgroup
+  }%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \section{Utility macros}
+% \begin{macros}{\same,\ifAllChars,\ifRest,\say}
+% The |\same| macro is an expandable string equality tester,
+% used by
+% $$|\if\same{#1}{#2}...\else...\fi|.$$
+% We accomplish
+% this by discarding the original |\if| with a |00\fi|, so
+% that it behaves well inside an |\iffalse|.  This is used
+% to make the custom counter macros more efficient.  The
+% actual code was mostly taken from the book \emph{\TeX{} by
+% Topic}.
+%    \begin{macrocode}
+\def\same#1#2{00\fi\ifAllChars#1$\Are#2$\TheSame}
+\def\ifAllChars#1#2\Are#3#4\TheSame
+   {\if#1$\if#3$\say{true}%
+          \else \say{false}\fi
+    \else \if#1#3\ifRest#2\TheSame#4\else
+                 \say{false}\fi\fi}
+\def\ifRest#1\TheSame#2\else#3\fi\fi
+   {\fi\fi \ifAllChars#1\Are#2\TheSame}
+\def\say#1#2\fi\fi
+   {\fi\fi\csname if#1\endcsname}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\@push,\sdh@cat}
+% These macros deal with |\@elt| lists and are global.
+%    \begin{macrocode}
+\def\@push#1#2{\begingroup\let\@elt\relax\xdef#1{\@elt #2#1}\endgroup}
+\def\sdh@cat#1:=#2#3{\begingroup\let\@elt\relax\xdef#1{#2#3}\endgroup}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\sdh@swapcounters}
+% This is a simple swap macro.  It destroys |\@tempcnta|.
+%    \begin{macrocode}
+\def\sdh@swapcounters#1#2{\@tempcnta#1\relax#1#2\relax#2\@tempcnta}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\@firstoffour,\@secondoffour,\@thirdoffour,\@fourthoffour}
+% These are self-explanatory.
+%    \begin{macrocode}
+\def\@firstoffour#1#2#3#4{#1}
+\def\@secondoffour#1#2#3#4{#2}
+\def\@thirdoffour#1#2#3#4{#3}
+\def\@fourthoffour#1#2#3#4{#4}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\sdh@warning,\sdh@error}
+% I define this to |\@latex@warning| for now.  Note that |\sdh@error| still
+% takes a second argument, i.e. |\@eha|.
+%    \begin{macrocode}
+\def\sdh@warning{\PackageWarning{floatprobsbegone}}
+\def\sdh@error{\PackageError{floatprobsbegone}}
+ % These seem to work given if@debug
+ %\def\sdh@debug{\if@debug\xa\sdh@debug@\fi}
+ %\def\sdh@debug@{\@ifnextchar*\message{\message{^^J***}\message}}
+
+ % This seems to work well...
+ %\def\sdh@debug@{\@ifnextchar*{\@firstoftwo\message}{\message{^^J***}\message}}
+ %\def\sdh@debug@on{\let\sdh@debug\sdh@debug@}
+ %\def\sdh@debug@off{\let\sdh@debug\@gobble}
+ %\sdh@debug@on
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\sdh@move,\sdh@movefront}
+% These macros move a given float box from one float list to another,
+% putting it onto either the back or front of the list.  One difficulty
+% is that the lists are nested, and when we define a fancy routine to
+% possilby suppress one of the floats, we need to be careful that it
+% never suppresses the nested lists.  Currently this takes the form
+% of a silly |\@gobble\relax| which get taken up by the |\@fourthoffour|
+% expansion.  We should maybe be careful, or maybe just change the
+% list delimiter for the inner list, although that would also be a
+% pain.  \textbf{If we change the size of the lists, we might get into
+% trouble}, but |\@gobble\relax| should probably be a safe way to handle
+% the saving or shorter lists.  Maybe |\@gobble\@gobble|\ldots|\relax|
+% and swapping |\@currbox| to the first argument so they don't pass,
+% or maybe a delimiter to tell us which kind of list we're in?
+% Currently the outer list we want to filter has quadruples, while
+% the inner list we want to protect has pairs.
+%    \begin{macrocode}
+\def\sdh@move#1#2#3{% Moves box #1 from #2 into #3
+  \begingroup
+  \xa\let\xa\@currbox#1%
+  \def\@elt##1{%
+    \xa\ifx\@fourthoffour##1\@currbox
+      \@cons#3{{##1}}%
+    \fi
+  }#2%
+  \def\@elt##1{%
+    \xa\ifx\@fourthoffour##1\@currbox\@gobble\relax\else
+      \noexpand\@elt{##1}%
+    \fi
+  }\xdef#2{#2}%
+  \endgroup
+}
+
+\def\sdh@movefront#1#2#3{% Moves box #1 from #2 into the front of #3
+  \begingroup
+  \xa\let\xa\@currbox#1%
+  \def\@elt##1{%
+    \xa\ifx\@fourthoffour##1\@currbox
+      \@push#3{{##1}}%
+    \fi
+  }#2%
+  \def\@elt##1{%
+    \xa\ifx\@fourthoffour##1\@currbox\@gobble\relax\else
+      \noexpand\@elt{##1}%
+    \fi
+  }\xdef#2{#2}%
+  \endgroup
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\sdh@make@ufi}
+% We develop the concept of a universal float indicator, or UFI,
+% that we use to identify float references.  We basically just jam
+% as much together as we can to ensure that there won't be any
+% duplication between two different floats in the same document.
+% This returns a simple string, and we can then test equality, or
+% else make it into a csname.  This csname is then used in the
+% |.aux| file to tell us whether or not we need to alter the number.
+% It is handy to have this defined here so that we can change it
+% if necessary without affecting too much... (actually we only
+% call it once...)
+%    \begin{macrocode}
+\def\sdh@make@ufi{\@captype:\csname sdh@c@\@captype\endcsname}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@checkbit}
+% This macro is used in |\sdh@which@fps|.  It's a bit sloppy.
+%    \begin{macrocode}
+\def\sdh@checkbit#1#2{% returns the #1 bit of #2
+  \begingroup
+    \count@#2\divide\count@#1%
+    \ifodd\count@
+      \aftergroup\@testtrue
+    \else
+      \aftergroup\@testfalse
+    \fi
+  \endgroup
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@showlists}
+% This is a debugging macro to see what's on all the lists
+%    \begin{macrocode}
+\def\sdh@showlists{%
+  \sdh@debug{pending: \sdh@fl@pending}%
+  \sdh@debug{top: \sdh@fl@top}%
+  \sdh@debug{here: \sdh@fl@here}%
+  \sdh@debug{bottom: \sdh@fl@bottom}%
+  \sdh@debug{defer: \sdh@fl@defer}%
+  \sdh@debug{currlist: \@currlist}%
+  \sdh@debug{margin: \sdh@fl@margin}%
+  \sdh@debug{marginlist: \the\sdh@marginlist}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@vmodeonly}
+% This simply emits an error if used in hmode.
+%    \begin{macrocode}
+\def\sdh@vmodeonly#1{%
+  \ifhmode\sdh@error{\string#1\space cannot be used in hmode}\@eha\fi}
+%    \end{macrocode}
+% \end{macro}
+%
+% \section{Custom counter routines}
+% In order to allow rearranging floats, we need to have a way to
+% renumber them when they get out of order.  \LaTeX{} increments
+% its reference counters at the time the float is called out and
+% the box is made.  We need to get into this step and substitute
+% the correct numbers at that time if they're known, but we also
+% need to keep our own count and increment them only when the
+% boxes actually get placed.  So we need two running counters,
+% and we keep our own in the list |\sdh@floatcount|.  Here we
+% define several routines to manipulate this list.
+%
+% \begin{macros}{\sdh@getcount,\sdh@stepcount,\sdh@zerocounters,%%
+%                \sdh@zerocounter}
+% |\sdh@getcount| is a bit messy.  We originally switched to
+% keeping the counts in a macro instead of a token register in
+% hopes of making this expandable, but unfortunately we need to
+% |\def\@elt|, which ruins expandability.  Nonetheless, we keep
+% |\@elt| expandable.  The other pain is that there doesn't seem
+% to be a way to get assignment to the given counter (|#1|) to be
+% local while keeping the |\@elt| definition inside a group: all
+% attempts at |\begin/\end/\aftergroup| failed miserably, and we'd
+% rather it not be |\global|.
+%    \begin{macrocode}
+\def\sdh@getcount#1#2{% #1=counter; #2=floattype e.g. figure
+  \let\@save@elt\@elt
+  \def\@elt##1{\xa\if\xa\same\xa{\@firstoftwo##1}{#2}%
+    \@secondoftwo##1\fi}%
+  \xa#1\xa0\sdh@floatcounts\relax
+  \let\@elt\@save@elt
+}
+%    \end{macrocode}
+% |\sdh@stepcount| just steps a counter.  We define it in a
+% slightly clever way by calling |\sdh@getcount| first, which
+% returns 0 if the counter isn't on the list yet.  We then
+% define |\@elt| to gobble the counter we asked for and finally
+% append the updated value onto the end of the list.
+%    \begin{macrocode}
+\def\sdh@stepcount#1{% #1=floattype, e.g. figure
+  \begingroup
+    \xa\let\xa\@temp@\csname the#1\endcsname
+    \sdh@getcount\@tempcnta{#1}%
+    \def\@elt##1{%
+      \xa\if\xa\same\xa{\@firstoftwo##1}{#1}\else\noexpand\@elt{##1}\fi
+    }%
+    \advance\@tempcnta\@ne
+    \xdef\sdh@floatcounts{\sdh@floatcounts\noexpand\@elt{{#1}{\the\@tempcnta}}}%
+  \endgroup
+}
+%    \end{macrocode}
+% Finally, |\sdh@zerocounters| just zeros all the counters we've
+% been keeping track of.
+%    \begin{macrocode}
+\def\sdh@zerocounters{%
+  \begingroup
+    \def\@elt##1{\noexpand\@elt{\@firstoftwo##1}{0}}%
+    \xdef\sdh@floatcounts{\sdh@floatcounts}%
+  \endgroup
+}
+%    \end{macrocode}
+% We can do this with just one counter too, using |\sdh@zerocounter|.
+%    \begin{macrocode}
+\def\sdh@zerocounter#1{%
+  \begingroup
+    \def\@elt##1{\noexpand\@elt{{\@firstoftwo##1}{%
+        \xa\if\xa\same\xa{\@firstoftwo##1}{#1}0\else\@secondoftwo##1\fi}}}%
+    \xdef\sdh@floatcounts{\sdh@floatcounts}%
+  \endgroup
+}
+
+ % This could be made more useful by allowing custom floats to be added
+\def\sdh@floatnums{figure: \the\c@figure}%, storybox: \the\c@storybox}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\sdh@combinemargin@i,\sdh@combinemargin@ii}
+% These routines build the margin into |\sdh@marginbox|, figure
+% out how tall it is, and put it alongside the |\@outputbox| on
+% the correct side.  It is split into two parts so that we can
+% deal with combining the floats in between the two parts.  It's
+% a bit tricky here because if we do it all too late then the
+% bottom floats will be too close to the bottom of the text if
+% the margin notes go too long, and if it's too early then we
+% end up leaking space in between paragraphs (I never figured
+% out why).  At the very least, we don't want to extend the
+% height of |\@outputbox| to |\textheight| until after the floats
+% are combined, so there should certainly be \emph{something} in
+% the second routine.  The following happens before |\@combinefloats|:
+% \begin{itemize}
+%   \item build the margin box
+%   \item if the margin box is taller than the page, 
+%         extend the page
+% \end{itemize}
+% The following happens after |\@combinefloats|:
+% \begin{itemize}
+%   \item if the main column is taller than the
+%         margin box, extend the margin box (change the height)
+%   \item check if the main column is too wide and emit a warning
+%   \item fix the main column width to the correct width in any case
+%   \item attach the margin box on the correct side
+% \end{itemize}
+%    \begin{macrocode}
+\def\sdh@combinemargin@i{%
+  % This runs BEFORE we combine the floats
+  \sdh@buildmargin
+  % Are we giving up the chance to stretch the outputbox here?!?
+  % ...maybe - but we need this to make sure that a full-width box
+  %    doesn't collide with a descended margin note.
+  \ifdim\ht\sdh@marginbox<\ht\@outputbox\else % We deal with this case later
+    % Add an extra vskip to bottom of \@outputbox!!!
+    \begingroup
+    \@tempdima\ht\@outputbox
+    % First try to stretch
+    \global\setbox\@outputbox\vbox to \ht\sdh@marginbox{\unvbox\@outputbox}%
+    \ifnum\badness>\@C
+      \global\setbox\@outputbox\vbox to \ht\sdh@marginbox{%
+        \unvbox\@outputbox\vfil % insert glue instead
+      }
+    \fi
+    \endgroup
+  \fi
+}
+\def\sdh@combinemargin@ii{%
+  % This runs AFTER we combine the floats...
+  \ifdim\ht\sdh@marginbox<\ht\@outputbox
+    % This will get complicated when we have [t] floats because it will
+    % push the margin box too high.  We'd rather have all this up top but
+    % that seems to cause extra space for some reason.  Also, we'd like
+    % to know when we have free space above/below due to non-oversized
+    % floats, and take advantage of that!  Maybe shift everything by the
+    % height of the topbox...?  split \@combinefloats into multiple parts?
+    \global\ht\sdh@marginbox\ht\@outputbox
+  \fi
+  \ifdim\wd\@outputbox>\columnwidth % emit a warning if it's too big
+    \sdh@warning{Main column width on page \the\c@page\space too large by%
+      \the\dimexpr\wd\@outputbox-\columnwidth}%
+  \fi
+  \wd\@outputbox\columnwidth % make sure always same width!
+  \ifodd\c@page
+    \setbox\@outputbox\vbox{\hbox{%
+      \box\@outputbox
+      \rlap{\hskip\marginparsep\box\sdh@marginbox}}}%
+  \else
+    \setbox\@outputbox\vbox{\hbox{%
+      \llap{\box\sdh@marginbox\hskip\marginparsep}%
+      \box\@outputbox}}%
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\@outputpage}
+% |\@outputpage| is called right before shipping the page out to
+% the DVI file.  Its job is to do any final processing on the
+% |\@outputbox|.  We had done the sidenotes here, but since moved
+% it to |\@makecol|.  We might decide to combine these.  We hook
+% into it so that we can get the final state of the top, here, and
+% bottom floats to check the ordering.  We also want to get in on
+% the first opportunity to dump any 'h' floats that we had to
+% defer for lack of space, and to size out any previously-deferred
+% floats that might now fit.
+%
+% Again,
+% |\@outputpage| is the last thing called by the output routine, eventually
+% shipping out the page.  The page to be output is passed in through
+% |\@outputbox|.  Our job is to intercept this box and add the margin box
+% to either the left or the right (depending on the parity of |\c@page|).
+% This code was moved to the float section.
+%
+%    \begin{macrocode}
+\Inline*\def\@outputpage{%
+  \sdh@combinemargin@ii % sdh 5/18 I found this commented, but why?!?
+  % above was copied from margin part
+  \sdh@renumberfigures
+  \sdh@build@tb
+  \@outputpage
+  \the\sdh@afterpage % do we want/need this?!
+  %\global\@colroom\textheight % will somebody else do this?
+  \global\sdh@floatpagetrue
+  \global\sdh@afterpage{}%
+  %%%%%%\gdef\shipout{\setbox\@tempboxa}% %%%@@@@@
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \section{Float pages}
+% We integrate into the code for making float pages.  There is
+% still quite a bit of work to be done with these, in particular,
+% integration with margin notes.  As it stands, float pages don't
+% even get a shot at margin notes at all, and this causes some funny
+% consequences as, e.g. |\clearmargin|s get seem to go extra distance
+% when we skip more pages than we ought.  Ultimately it would be
+% nice to get margins flowing around these floats.  We also want
+% a macro to convert the extra margin boxes into float boxes that
+% can get some ``main column'' presence.
+%
+% \subsection{Debugging code}
+% The following macros are redefined so that we can get extra
+% output in the middle.
+%
+% IMPORTANT! I've actually altered the functioning of |\sdh@old@tryfcolumn|
+% to make |\sdh@fl@bottom| and |\sdh@fl@top| block as well...  This was the
+% easiest way to do it, but at some point we'll have to find a better way?
+% \begin{macros}{\@xtryfc,\@ytryfc,\@ztryfc,\sdh@old@tryfcolumn}
+%    \begin{macrocode}
+\def\@xtryfc #1{%
+  \sdh@debug{@xtryfc testing box #1 (ht=\the\ht#1)}%
+  \@next\reserved@a\@trylist{}{}%
+  \@currtype \count #1%
+  \divide\@currtype\@xxxii
+  \multiply\@currtype\@xxxii
+  \@bitor \@currtype \@failedlist
+  \if@test\sdh@debug*{ -> failed bitor}\fi
+  \if@test\else
+    \@testfp #1%
+    \if@test\sdh@debug*{ -> failed [p]}\fi
+  \fi
+  \ifdim \ht #1>\@colht
+    \sdh@debug*{ -> too big}%
+    \@testtrue
+  \fi
+  \if@test
+    \sdh@debug*{ -> failed}%
+    \@cons\@failedlist #1%
+  \else
+    \@ytryfc #1%
+  \fi}
+\def\@ytryfc #1{%
+  \sdh@debug{@ytryfc testing box #1}%
+  \begingroup
+    \gdef\@flsucceed{\@elt #1}%
+    \global\let\@flfail\@empty
+    \@tempdima\ht #1%
+    \let\@elt\@ztryfc
+    \@trylist
+    \ifdim \@tempdima >\@fpmin
+    \sdh@debug*{ -> made column}%
+    \global\@fcolmadetrue
+  \else
+    \sdh@debug*{ -> too small (\the\@tempdima < \the\@fpmin)}%
+    \@cons\@failedlist #1%
+  \fi
+  \endgroup
+  \if@fcolmade
+    \let\@elt\@gobble
+  \fi}
+\def\@ztryfc #1{%
+  \sdh@debug{@ztryfc on box #1}%
+  \@tempcnta \count#1%
+  \divide\@tempcnta\@xxxii
+  \multiply\@tempcnta\@xxxii
+  \@bitor \@tempcnta {\@failedlist \@flfail}%
+  \if@test\sdh@debug*{ -> failed bitor \the\@tempcnta}\fi
+  \if@test\else\@testfp #1\if@test\sdh@debug*{ -> failed [p]}\fi\fi
+  \@tempdimb\@tempdima
+  \advance\@tempdimb \ht#1%
+  \advance\@tempdimb\@fpsep
+  \ifdim \@tempdimb >\@colht
+    \sdh@debug*{ -> too big (\the\@tempdimb > \the\@colht)}%
+    \@testtrue
+  \fi
+  \if@test
+    \sdh@debug*{ -> doesn't fit}%
+    \@cons\@flfail #1%
+  \else
+    \sdh@debug*{ -> adding to page}%
+    \@cons\@flsucceed #1%
+    \@tempdima\@tempdimb
+  \fi}
+\renewcommand\@wtryfc[1]{%
+  \global\setbox\@outputbox\vbox{%
+    \unvbox\@outputbox
+    \vskip\@fpsep%
+    \sdh@tryfullwidth#1%
+    \box#1%
+  }%
+}%
+\def \sdh@old@tryfcolumn #1{%
+  \sdh@debug{\string\@tryfcolumn (\string\@fpmin=\the\@fpmin): }%
+  \global \@fcolmadefalse
+  \ifx #1\@empty
+    \sdh@debug*{defer list empty}%
+  \else
+    \sdh@debug*{defer list: \meaning#1}%
+     \xdef\@trylist{#1}%
+     %%%%%%%%%%%%\global \let \@failedlist \@empty
+     \sdh@map\@failedlist<-\@fourthoffour{\sdh@fl@top\sdh@fl@bottom}%
+     \begingroup
+        \let \@elt \@xtryfc
+        \@trylist
+     \endgroup
+     \if@fcolmade
+        \sdh@debug{Making a float column}%
+        \@vtryfc #1%
+     \fi
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \subsection{Miscellaneous float page concerns}
+% \begin{macro}{\sdh@testfp}
+% The \LaTeX{} kernel uses |\@testfp| to see whether a float
+% should go on a float page based on its float placement specifier (fps),
+% and when it's desperate to make a float page, it simply |\let|s this
+% to |\@gobble|.  This routine sets |\@testtrue| if the float is ineligible.
+% We may at some point want to override this behavior, or maybe extend it
+% (i.e. only allow floats to go on odd pages, etc, like the original rpbook
+% macros did by obnoxiously overriding |\@xtryfc|).  I don't currently
+% use this macro.
+%    \begin{macrocode}
+\def \sdh@testfp #1{%
+  % \ifodd\c@page\@testtpg#1\fi
+   \@boxfpsbit #1 8\relax % Really #1 8 for human readers!
+   \ifodd \@tempcnta
+   \else
+     \@testtrue
+   \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@makefcol}
+% When we get to the end of the text, we want to output everything
+% on float pages, regardless of FPS or |\@fpmin|.  In these cases,
+% we can call |\sdh@makefcol| and it will convert |\@tryfcolumn| to
+% ignore these things.  This is automatically called by |\@tryfcolumn|
+% if |sdh@floatbarrier| is set, so we don't need to worry about
+% grouping, etc, since that's built in now.
+%
+% Here's a strange thing: I had a box with height ZERO and the
+% float page would never set it because it was always too small
+% (it was actually |void|)  We might want to change the |\@fpmin|
+% for when we're desperate to something ridiculous like |-100in|,
+% or else we should take it as a sign that there's a more
+% fundamental problem.
+%    \begin{macrocode}
+\def\sdh@makefcol{\@fpmin0\p@\let\@testfp\@gobble}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\@tryfcolumn}
+% In the \LaTeX{} kernel, this routine takes a list (either
+% |\@deferlist| or |\@dbldeferlist| and then tries to add the
+% floats in it to a float page.  Since we've only got one defer
+% list, we'll simply ignore whatever argument is passed to us
+% and use our own instead.  We also need to do the following
+% \begin{itemize}
+%   \item convert our own (complicated) float list format to be
+%     compatible with \LaTeX's own simple format (simply |\@elt\bx@?|)
+%   \item save the |\@freelist| so that we can find out which boxes
+%     got set and then take them out of our own defer list (by
+%     moving them to |\sdh@fl@here| so that the renumbering routine
+%     will get to see them)
+%   \item ultimately recombine the |\@freelist|s.
+% \end{itemize}
+% Since we're using most of the same internal machinery, we get the
+% use of the same variables for free: |\@colht|, |\@fpmin|,
+% |\@fpsep|, |\@fptop|, |\@fpbot|, and |\if@fcolmade|.
+%
+% Initially we had the idea that any float could go on a float page,
+% but now that seems silly: we should respect the FPS for now and only
+% ignore it at the end of the text.
+%
+% Also, we currently ignore ordering, but that might need to change soon
+% in which case we'll need to use |\@bitor| again, since that's what the
+% internal tests use.  One possibility is to manually allow the |ftype|
+% bit to get unset for floats, or to define a float to have |ftype|=0 if
+% it should always be disorderable.
+%    \begin{macrocode}
+\def\sdh@map#1<-#2#3{%
+  % #2 is function, #3 is source, #1 is destination
+  % Function must return a single unit
+  \def\@elt##1{\xa\noexpand\xa\@@elt#2##1}%
+  \edef#1{#3}\let\@elt\relax\def\@@elt{\@elt}\edef#1{#1}%
+}
+
+\def\@tryfcolumn#1{%
+  \begingroup
+  \ifsdh@floatbarrier\sdh@makefcol\fi
+  %\def\@bitor{\@testfalse\@gobbletwo}% actually do it!
+  \sdh@debug{\string\@tryfcolumn: \meaning\sdh@fl@defer}%
+  \sdh@map\@temp@<-\@fourthoffour\sdh@fl@defer
+  \let\sdh@save@freelist\@freelist
+  \let\@freelist\@empty
+  \sdh@debug{@temp@: \meaning\@temp@}%
+  \let\@elt\relax
+  \sdh@old@tryfcolumn\@temp@
+  \let\sdh@pagelist\@freelist
+  \sdh@cat\@freelist:=\sdh@pagelist\sdh@save@freelist
+  % Now \@freelist is the list of boxes we added to this page
+  \if@fcolmade
+    \sdh@debug{FLOAT PAGE: \meaning\sdh@pagelist}%
+    % \sdh@fl@here better be empty or something is fishy.
+    \ifx\sdh@fl@here\@empty\else\sdh@error{Here list should be empty}\@eha\fi
+    \def\@elt##1{\sdh@move##1\sdh@fl@defer\sdh@fl@here}\sdh@pagelist
+    % \sdh@renumberfigures gets called by \@outputpage via \@opcol
+  \fi
+  \endgroup
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\@makecol}
+%    \begin{macrocode}
+\Inline*\def\@makecol{%
+  %\sdh@debug{@makecol height: \the\ht\@cclv}%
+  \@makecol
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\@startcolumn}
+% We need to wait for \@startcolumn to reset the column values
+% before we start typing to place the deferred floats.  Maybe this
+% is where we try to decide to make a special float page?
+%    \begin{macrocode}
+\Inline*\def\@startcolumn{\@startcolumn
+  \sdh@debug{@startcolumn}%
+  % sdh 5/30/08 - we don't want to checkdeffered if we just made a float page
+  % -> combinefloats won't get run until the next page, but then we haven't
+  % accounted for the height of the float so it'll run off the page!
+  \if@fcolmade\else\global\sdh@floatpagefalse\sdh@check@deferred\fi}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{@addtocurcol}
+% The original |\@addtocurcol| was called as soon as the |-\@Mii| or
+% |-\@Miii| penalty activates the OR. |\@currbox| has been taken off
+% |\@currlist|, but not yet freed.  We need to decide what to do
+% with this box and either defer it or set it.
+% We need to make sure no boxes get onto any of \LaTeX's built-in
+% lists without our knowing about it.
+% So far, we don't deal with double columns (which uses an entirely
+% different set of macros, as far as I can tell).  In this case,
+% this routine is called in order for each float.  But we've
+% already got ordering taken care of, and in fact we'll use this
+% in the deferral routine, so we probably don't want to do numbering
+% here.  The |\sdh@checkdeferred| is not currently used, but would
+% eventually have to do with blocking floats from migrating.
+%    \begin{macrocode}
+\def\@addtocurcol{%
+  \sdh@debug{Request to add float \@currbox}%
+  %\sdh@debug{\vsize=\the\vsize, \@colroom=\the\@colroom}%
+  \@setfloattypecounts % sets \@fpstype
+  \sdh@which@fps
+  %\sdh@debug{Soon: sdh@dofps = \meaning\sdh@dofps}%
+  \sdh@checkfloatsize %\sdh@checkdeferred
+  %\sdh@debug{Next: sdh@dofps = \meaning\sdh@dofps}%
+  \sdh@dofps
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\do@clearpage}
+% Right now we're just using this for debugging, adding an extra
+% message to see when it's called.  We also hooked into it to
+% print a silly warning message, but there's gotta be a better
+% place (unfortunately, |\AtEndDocument| doesn't work because
+% the last pages haven't yet been set, so the floats might get
+% out of order afterwards).  We could add a conditional so that
+% it can go in |\AtEndDocument| but then also still emit the
+% warning even if it's later, or else just redefine the thing.
+%    \begin{macrocode}
+ %\def\@doclearpage{%
+ %  \sdh@debug{doclearpage}
+ %  \sdh@old@doclearpage
+ %  \ifnum\outputpenalty<-10000\sdh@disorderedfloats\fi
+ %}
+ \Inline*\def\@specialoutput{%
+   %\sdh@debug{botlist: \meaning\@botlist}%
+   \sdh@debug{***specialoutput \the\outputpenalty: \@currlist}%
+ %%%% This was supposed to allow really nice OR injection... :-/
+ %  \ifnum\outputpenalty=-10005%\@Mv % custom routine!
+ %    \message{^^Jhmm}%
+ %      \global \setbox\@holdpg \vbox{%
+ %                \unvbox\@holdpg
+ %                \unvbox\@cclv
+ %                \setbox\@tempboxa \lastbox
+ %                \unskip
+ %         }%
+ %      \@pagedp \dp\@holdpg
+ %      \@pageht \ht\@holdpg
+ %    \message{^^J\the\@pageht}%
+ %      \unvbox \@holdpg
+ %    \the\sdh@outputcode
+ %      \@reinserts
+ %      \ifnum \outputpenalty<\z@
+ %        \if@nobreak
+ %          \nobreak
+ %        \else
+ %          \addpenalty \interlinepenalty
+ %        \fi
+ %      \fi
+ %    \global\sdh@outputcode{}%
+ %  \else\sdh@old@specialoutput\fi
+  \@specialoutput
+   %\begingroup\countlist\@currlist
+   %\ifnum\count@>\z@\sdh@warning{Extra float(s) in \string\@specialoutput\space
+   %  on page \the\c@page: \sdh@floatnums}\fi
+   %\endgroup
+   %\sdh@debug{botlist: \meaning\@botlist}%
+ }
+ %\let\sdh@old@topnewpage\@topnewpage
+ %\def\@topnewpage{\sdh@debug{topnewpage}\sdh@old@topnewpage}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\refstepcounter}
+% We need to take some care here.  In particular, we may or may
+% not be refstepping a floating environment counter, and it might
+% not be the float box we're currently in.  We compare the argument
+% to |\@captype| (which may or may not be defined) to see if we
+% need to intercept it.
+%
+% Once we decide to interfere, the plan of attack is to save the
+% current value of the counter, figure out where we are in the document
+% and construct the UFI so that we can (a) find out if this float was
+% recorded as moved in the |.aux| file, and (b) save the UFI in a
+% UFI list to be associated with this float in our float lists.
+% After this macro finishes, the |\c@TYPE| counter will hold the
+% corrected value, and the ``incremental'' value is safely stored
+% in |\sdh@holdfloatnum|, to be restored when we hit |\end@float|
+% (or temporarily at the next |\refstepcounter|).
+%
+% We need to be careful how we do this.  We can't rely on |\end@float|
+% ever being called, so we must either insert a hook at the end of the
+% caption routine to restore the counter, or else redefine |\theTYPE|
+% and |\fnum@TYPE| to return a different value.  We're going for the
+% second option.  Note that |\theTYPE| \emph{must} be expandable, so
+% we need to use the rather overcomplicated |\sdh@ifinfloat| macro,
+% which uses the |\sdh@hop@X| macros to allow rather general arguments.
+%
+% PROBLEM: even when we use these hopping macros, there's the counter
+% assignment that still doesn't expand.  A better idea still is to make
+% our own counters |\sdh@c@figure|, etc and keep track of them ourselves.
+% Unfortunately, |\newcount| is |\outer|, so we can't use it inside
+% |\refstepcounter|.  Instead, we can just use |\xdef|s, which isn't
+% quite as nice, but gets the job done.
+%
+% If we want to ever not have to save the numbering to the aux file,
+% then we need to find some way to get our |\sdh@c@|TYPE counters
+% reset at the proper times.  Or we could just ignore that and save
+% every figure to the aux file.  This might not be so bad, since we
+% already get |lof| entires for each.  Unless we run out of memory
+% for macros...?  But we build them all with |\csname| anyway to see
+% if they were defined in the aux file.
+%
+% New plan:
+%  Define |\sdh@c@#1| to always keep proper track of things
+%  Always increment it by one each time.  Use that as in index
+%  Because we never reset it, ufi's can be shorter..., just type:num
+%  At the end of this routine, |\c@#1| will have what we think is the
+%  right number...
+%
+% Another improvement:
+% We could postincrement the sdh@counters instead of preincrementing
+% and then the whole thing just gets subsumed into ``check if we need
+% to substitute a value for |\c@#1| and then call |\sdh@old@refstepcounter|''.
+%
+% Important point: The UFI list stores the number we would get WITHOUT
+% the help of the auxfile.
+%    \begin{macrocode}
+\Inline*\def\refstepcounter#1{%
+  \begingroup\edef\@temp@{#1}%
+  \ifx\@temp@\@captype\endgroup % Yes, \@captype tells us to proceed
+    \xa\let\xa\@@\csname c@\@captype\endcsname % \@@ <- \c@#1
+    \xa\def\xa\@@@\xa{\csname sdh@c@\@captype\endcsname} % \@@@ <- \sdh@c@#1
+    % Step 1: Check if this is the first time we've been called on this type
+    \xa\ifx\@@@\relax
+      \xa\xdef\@@@{0}% Yes, so we need to define \sdh@c@#1
+    \fi
+    % Step 2: Construct a UFI
+    \edef\this@ufi{\sdh@make@ufi}%
+    \xa\let\xa\this@newnum\csname newnum@\this@ufi\endcsname
+    % Step 3: Add the UFI and the ORIGINAL number to the UFI list
+    \begingroup
+      \edef\@temp@{{{{\this@ufi}{\the\@@}}}}%
+      \xa\@cons\xa\sdh@ufilist\@temp@
+    \endgroup
+      %\sdh@debug{ufilist: \sdh@ufilist}%
+    % Step 4: Figure out if we've got a correction or not
+    %         -> \@@ now has the (hopefully) correct value
+    \ifx\this@newnum\relax\else % We've seen this before: use the real value
+      %\sdh@debug{CORRECTING \the\@@ -> \this@newnum}%
+      \xa\@@\this@newnum % Use the saved value
+    \fi
+    % Step 5: Increment \sdh@c@#1
+    \xa\xa\xa\count@\@@@ % get \the\@@@, effectively
+    \advance\count@\@ne
+    \xa\xdef\@@@{\the\count@}%
+    % Now do normal refstep
+  \else\endgroup\fi % funny nesting here!
+  \Super % do normal step now for everybody!
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\@stpelt}
+% |\@stpelt| resets a given counter.  We just want to extend this to
+% also reset our version of the counter too.
+%    \begin{macrocode}
+\Inline*\def\@stpelt#1{\Super\sdh@zerocounter{#1}}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\@xfloat,\end@float}
+% We overload these macros to set up the reference counting.
+% In |@xfloat| we need to empty the UFI list and note that we
+% haven't yet swapped the counter into |\sdh@holdfloatnum| (since
+% we don't yet know the |\@captype|!).  On the way out, we possibly
+% restore the held counter (only if we ever swapped it---if there
+% was never a |\refstepcounter| then we never stored it in the first
+% place), and then add the float onto the pending list (along with
+% the UFI list).  We need to check if |\@captype| is defined because
+% margin notes also use |\end@float|, but we don't want to add them
+% to our pending float list.  We're a bit sloppy about it, since we
+% want to also catch marginpars with fixed captions.
+%    \begin{macrocode}
+\Inline*\def\end@float{%
+  \begingroup
+    %\sdh@debug{endfloat(\@currbox): \sdh@ufilist}%
+    \ifx\@captype\undef % take a stab at defining a \@captype
+      \def\eat##1:##2\x{##1}%
+      \def\@elt##1{\edef\@captype{\xa\eat\@firstoftwo##1\x}}%
+      %\sdh@debug{ => \sdh@ufilist}%
+      \sdh@ufilist
+      \let\@elt\relax
+      %\sdh@debug{ => \sdh@ufilist}%
+    \fi
+    \ifx\@captype\undef % 5/31/08 - does this ever happen?!?
+      %\sdh@debug{skipped float: \@currbox}
+      %\sdh@error{This should never happen?  pending skipped!}\@eha
+      \sdh@addpending@nocaptype
+    \else
+      %\sdh@debug{ => \@captype -- \sdh@ufilist}%
+      \sdh@addpending
+    \fi
+    %\ifsdh@counterstepped
+    %  \xa\let\xa\@@\csname c@\@captype\endcsname
+    %  \global\@@\sdh@holdfloatnum % Restore the state here...
+    %  \global\sdh@countersteppedfalse
+    %\fi
+  \endgroup
+ % \ifinner %% sdh - I don't know why this isn't the case?!
+ %   \sdh@error{Cannot call out floats from an inner mode}\@eha
+ % \fi
+  \global\let\sdh@last@currbox\@currbox % doesn't look like we use this?
+  \gdef\sdh@fl@inline{\sdh@fl@here}%
+  \global\let\sdh@ufilist\@empty % still need this so can capture fixed captions
+  \let\@captype\undef
+  \end@float % used to be at the end...
+  \sdh@adjustpendingwidth
+  \ifsdh@disorderfloat
+    \count@\count\@currbox\divide\count@\@xxxii\multiply\count@\@xxxii
+    \global\advance\count\@currbox-\count@
+  \fi
+  \sdh@disorderfloatfalse
+}
+
+\def\thisfloatdisordered{\global\sdh@disorderfloattrue}
+
+\def\sdh@foreach#1#2{%
+  \let\@list#1%
+  \def\@code@{#2}%
+  \sdh@foreach@
+}
+\def\sdh@foreach@{%
+  \def\@cont@{\sdh@foreach@}%
+  \@next\@temp@\@list{\xa\xa\xa\@code@\@temp@}{\let\@cont@\relax}%
+  \@cont@
+}
+
+\def\sdh@clearufilist{%
+  % if we've got something here, it's from a fixed caption - deal with it...
+  % difficulty: correct ordering between [h] floats and fixeds.
+  % Solution for now: leave behavior unspecified.  But we do want to increment
+  % the counters, at least!  So call this on new pages and whenever we start a
+  % float.
+  \begingroup
+    \def\eat##1:##2\x{##1}% this is handy for pulling out the \@captype
+    \def\process##1##2{%
+      \edef\@captype{\eat##1\x}%
+      \edef\@temp@{{{{\@captype}{}%
+                     {\noexpand\@elt{{##1}{##2}}}\relax}}}% no box...
+      %\message{^^J===\space\space ADDING TO HERE: \@temp@}%
+      \xa\@cons\xa\sdh@fl@here\@temp@%
+      %\message{^^J===\space\space HERE: \sdh@fl@here}%
+    }%
+    \sdh@foreach\sdh@ufilist\process
+    \global\let\sdh@ufilist\@empty
+  \endgroup
+}
+
+\Inline*\def\@xfloat#1[#2]{%
+  \sdh@countersteppedfalse
+  \gdef\sdh@fl@inline{\sdh@fl@pending}%
+  \sdh@clearufilist % also need one in marginpar!!
+  \sdh@debug{***adding a float}%
+  \global\sdh@disorderfloatfalse
+  \Super
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \section{Float-building and setting routines}
+%
+% We have a number of auxiliary macros we use in the output
+% routine.
+% \begin{macro}{\sdh@build@tb}
+% |\sdh@build@tb| isn't currently needed since we just put the
+% float boxes into \LaTeX's |\@toplist| and |\@botlist| to have
+% it set automatically by |\@combinefloats|.  We might want this
+% hook later, though.  We'll need to be careful of the heights
+% and spaces since we're taking all the decisions out of \LaTeX's
+% hands.  Also, if we want to get margin phantoms to work\ldots
+%    \begin{macrocode}
+\def\sdh@build@tb{}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@check@deferred}
+% |\sdh@check@defered| is called after each page is typeset.
+% We look at the |\sdh@fl@defer| list to see if any of these
+% floats will fit onto the next page, before we put any (more)
+% text onto it.  We start by swapping the defer list with an
+% empty one.  We then, one by one, take floats off the copy
+% and put them into the pending list, calling |\@addtocurcol|
+% with an appropriate |\@currbox| as if we had just called
+% it out.
+%    \begin{macrocode}
+\def\sdh@check@deferred{%
+  % What we need to do is add as many figures as we can.
+  % How do t's and b's ever turn into p's??
+  % (1) if we call \dumpfloats, it should happen automatically now?
+  % (2) if the size of a single float exceeds textfraction limitations
+  %     then we know there won't be any text... then what?
+  %     Can we then play with \if@fcolmade (or whatever)?
+  %%%%%%%
+  % It looks like \@tryfcolumn is happening TWICE!
+  \sdh@debug{check@deferred}%
+  \let\sdh@prev@defer\sdh@fl@defer
+  \let\sdh@fl@defer\@empty
+  \begingroup
+    \@tempswatrue % used to just use \@whilesw\ifsdh@floatfits
+    \@whilesw\if@tempswa\fi{%
+      % Problem here: we stop looking prematurely - there may be a
+      % small enough float LATER that can go in...
+      \@next\@temp@\sdh@prev@defer{%
+        %\sdh@debug{\@temp@}%
+        \edef\@currbox{\xa\@fourthoffour\@temp@}%
+        \edef\@temp@{{{\@temp@}}}%
+        \xa\@cons\xa\sdh@fl@pending\@temp@
+        \@addtocurcol
+      }\@tempswafalse % used to be \sdh@floatfitsfalse
+    }%
+  \endgroup
+  \sdh@cat\sdh@fl@defer:=\sdh@fl@defer\sdh@prev@defer
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@renumberfigures}
+% |\sdh@renumberfigures| looks at the top, here, and bottom lists
+% to make sure that everything is in order.  When floats are moved,
+% it writes to the aux file and, if previously unknown, also issues
+% a warning.
+%
+% Problem: fixed captions -> where do we add them?!?
+%    \begin{macrocode}
+\def\sdh@renumberfigures{%
+  % We already freed the here figures...? so their counter values
+  % may be hosed!
+  \sdh@debug{Renumbering figures}%
+  \sdh@showlists
+  % Basically we need to get the counting mechanism in place for this
+  % After we're done, we need to clear what we've already set...
+  %
+  % We could implement mergesort here to put everything into a vertical
+  % list.  And/or define \@leftcol and \@rightcol, one to be empty and
+  % the other to be the marginlist.
+  \sdh@clearufilist
+  \begingroup
+    %\message{^^J===FLOAT LIST (\the\c@page): \sdh@fl@top || \sdh@fl@here || \sdh@fl@bottom || \sdh@fl@margin}%
+    %\message{^^J===COUNTS \meaning\sdh@floatcounts}%
+    \def\@elt##1{% outer \@elt's (float list)
+      \def\@null{{}}%
+      \edef\@captype{{\@firstoffour##1}}%
+      \ifx\@null\@captype\else
+      \begingroup % inner \@elt's (ufi lists)
+        \def\@elt####1{%
+          %\sdh@debug{*** in an elt: ####1}%
+          \edef\@ufi{\@firstoftwo####1}%
+          \xa\sdh@getcount\xa\@tempcnta\@captype
+          \xa\count@\@secondoftwo####1\relax
+          % If we want to only save some of the numbers, then we need to
+          % save more information in the ufilist, particularly whether
+          % the current number depended on being assigned...
+          % ALTERNATELY, we could just store it there!
+          \ifnum\count@=\@tempcnta % Do we need to change something?
+            %\message{^^J===\space\space NO RENUMBER \@ufi=\the\@tempcnta}%
+          \else
+            %%%% Figure out if we need to warn
+            %\message{^^J===\space\space RENUMBERING \@ufi->\the\@tempcnta}%
+            \xa\let\xa\@newnum\csname newnum@\@ufi\endcsname
+            \ifx\@newnum\relax
+              \sdh@floats@disordered
+            \else
+              \xa\ifnum\@newnum=\@tempcnta\else
+                \sdh@floats@disordered
+              \fi
+            \fi
+            % OK, now just write the aux file
+            % I'm not sure what effect \protected@write has instead, but
+            % it doesn't seem to work, either on \@mainaux or \@auxout.
+            \immediate\write\@auxout{%
+              \string\expandafter\gdef
+                \string\csname\space newnum@\@ufi\string\endcsname
+                                     {\the\@tempcnta}}%
+          \fi
+          \xa\sdh@stepcount\@captype
+        }\@thirdoffour##1% run the UFIs
+      \endgroup\fi
+    }%
+  \ifodd\c@page % run in order
+    \sdh@fl@top\sdh@fl@here\sdh@fl@bottom\sdh@fl@margin
+  \else
+    \sdh@fl@margin\sdh@fl@top\sdh@fl@here\sdh@fl@bottom
+  \fi
+  \endgroup
+  \sdh@debug{Emptying here,top,bottom,margin}%
+  \global\let\sdh@fl@here\@empty
+  \global\let\sdh@fl@top\@empty
+  \global\let\sdh@fl@bottom\@empty
+  \global\let\sdh@fl@margin\@empty
+  %\message{^^J===ENDCOUNTS \meaning\sdh@floatcounts^^J===}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@which@fps}
+% This looks at |\@fpstype| and then assigns |\sdh@dofps|
+% to an appropriate routine to handle it.  For now, we just have
+% a limited subset of handlers.  We could make an expandable
+% bit tester if we just pre-write |\@fpstype| in binary.
+%    \begin{macrocode}
+\def\sdh@which@fps{%
+  \sdh@debug{float[\the\@fpstype]}
+  \ifodd\@fpstype
+    \sdh@checkbit\sixt@@n\@fpstype\if@test
+      \let\sdh@dofps\sdh@float@h
+      \sdh@debug*{-> float[h]}%
+    \else
+      \let\sdh@dofps\sdh@float@hh
+      \sdh@debug*{-> float[h!]}%
+    \fi
+  \else
+    % not an h
+    \sdh@checkbit\tw@\@fpstype\if@test
+      \sdh@checkbit\f@ur\@fpstype\if@test
+        \let\sdh@dofps\sdh@float@tb
+        \sdh@debug*{-> float[tb]}%
+      \else
+        \let\sdh@dofps\sdh@float@t
+        \sdh@debug*{-> float[t]}%
+      \fi
+    \else
+      \sdh@checkbit\f@ur\@fpstype\if@test
+        \let\sdh@dofps\sdh@float@b
+        \sdh@debug*{-> float[b]}%
+      \else
+        % not t or b
+        \sdh@checkbit\sixt@@n\@fpstype\if@test
+          \let\sdh@dofps\sdh@float@p
+          \sdh@debug*{-> float[p]}%
+        \else
+          \let\sdh@dofps\sdh@float@pp
+          \sdh@debug*{-> float[p!]}%
+        \fi
+      \fi
+    \fi
+  \fi
+  % Will this work? - it seems to work ok...?
+  %\ifsdh@floatbarrier\let\sdh@dofps\sdh@float@p\fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\sdh@float@hh,\sdh@float@pp,\sdh@float@t,\sdh@float@tb}
+% These aren't yet supported directly, so we just map them onto
+% handlers we already have
+%    \begin{macrocode}
+\def\sdh@float@hh{\sdh@float@h}
+\def\sdh@float@pp{\sdh@float@p}
+\def\sdh@float@t{\sdh@float@b}
+\def\sdh@float@tb{\sdh@float@b}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\sdh@float@h}
+% This takes the |[h]| floats and determines if we have enough space
+% left in the column to set it.  If so, it is set immediately, and
+% otherwise, the float is held back while the page is broken, and
+% then immediately re-added.  Ultimately, we may allow an |[h]|
+% float to be deferred or moved around, particularly based on
+% potential commands like |\strictfloatordering| and others.
+% We may have three levels of ordering, in which no floats are
+% ever rearranged, floats of different types may be rearranged,
+% or all floats may be rearranged.  Also, there's a distinction
+% between rearranging for better fit versus rearranging to better
+% obey the fps.  This sort of thing may have to do with i.e. |[h!]|.
+% If we decide we're allowed to defer a |[h]| float, then we should
+% remove the |h| from the fps and leave whatever's left over.
+%    \begin{macrocode}
+\def\sdh@float@h{%
+  \ifsdh@floatfits
+    \sdh@debug{h float fits: \@currbox}%
+    % stolen from original @addtocurcol
+    \if@nobreak
+      \nobreak
+      \@nobreakfalse
+      \everypar{}%
+    \else
+      \addpenalty \interlinepenalty
+    \fi
+    \vskip\intextsep
+    \sdh@addfloattocolumn
+    % end stolen code
+    \sdh@free\@currbox
+  \else
+    \sdh@debug{h float doesn't fit: \@currbox}%
+    \sdh@deferfloat
+    \vfill\penalty-\@M % output the page?
+    % We might want to instead conver to 't', etc.
+  \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@float@b}
+% This handles floats that want to go on the bottom of the page.
+% If the float fits on the current page, it is added to \LaTeX's
+% |\@botlist|, and otherwise is added to our own defer list.
+%    \begin{macrocode}
+\def\sdh@float@b{%
+  \ifsdh@floatfits
+    \sdh@debug{b float fits: \@currbox}%
+    \sdh@move\@currbox\sdh@fl@pending\sdh@fl@bottom
+    %\sdh@debug{colroom=\the\@colroom, size=\the\@tempdima}%
+    %\global\advance\@colroom-\@tempdima % (other skips?)
+    %\sdh@debug{colroom (after)=\the\@colroom}
+    %%\global\advance\vsize-\@tempdima % (other skips?)
+    %\global\vsize\@colroom
+    %\@cons\@botlist\@currbox
+    \global\maxdepth\z@ % this is LaTeX's method
+    \@flupdates\@botnum\@botroom\@botlist
+    %\sdh@tryfullwidth
+  \else
+    \sdh@debug{b float doesn't fit: \@currbox}%
+    \sdh@move\@currbox\sdh@fl@pending\sdh@fl@defer
+  \fi
+  %\sdh@debug{botlist: \meaning\@botlist}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@float@p}
+% This handles floats that want to go on their own page.
+% If the float fits on the current page, it is added to \LaTeX's
+% |\@botlist|, and otherwise is added to our own defer list.
+% We also co-opt this routine for |\inject| to use.
+%    \begin{macrocode}
+\def\sdh@float@p{%
+  \sdh@debug{Checking p float for injection: \meaning\@currbox\space
+    vs. \meaning\sdh@injectbox}%
+  \ifx\@currbox\sdh@injectbox %%%% OR injection code
+    \@cons\@freelist\@currbox
+    \let\sdh@trash\@empty
+    \sdh@move\@currbox\sdh@fl@pending\sdh@trash
+    \the\sdh@outputcode
+    \global\sdh@outputcode{}%
+    \global\let\sdh@injectbox\relax
+  \else %%%% NORMAL CODE
+    \sdh@debug{p float: \@currbox}%
+    \@testfalse
+    \ifsdh@floatpage \ifsdh@floatfits \@testtrue \fi \fi
+    \if@test % this is a float page and it fits...
+    % But I don't think we use this mechanism anymore!
+      \UNUSED@CODE@IN@FLOAT@P
+      \sdh@debug*{ -> fits}%
+      %\sdh@debug{p float fits: \@currbox}%
+      \sdh@move\@currbox\sdh@fl@pending\sdh@fl@bottom
+      %\sdh@debug{colroom=\the\@colroom, size=\the\@tempdima}%
+      %\global\advance\@colroom-\@tempdima % (other skips?)
+      %\sdh@debug{colroom (after)=\the\@colroom}
+      %%\global\advance\vsize-\@tempdima % (other skips?)
+      %\global\vsize\@colroom
+      %\@cons\@botlist\@currbox
+      \global\maxdepth\z@ % this is LaTeX's method
+      \@flupdates\@botnum\@botroom\@botlist
+      %\sdh@tryfullwidth
+    \else
+      \sdh@debug*{ -> deferred}%
+      %\sdh@debug{p float doesn't fit: \@currbox}%
+      \sdh@move\@currbox\sdh@fl@pending\sdh@fl@defer
+    \fi
+ \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@checkfloatsize}
+% Here we check whether the float in |\@currbox| will fit on the
+% page.  The total column height (not counting any floats we've
+% already promised to add) is stored in |\@colroom|, and the
+% current amount of text has been put in |\@pageht| bt the output
+% routine.  We set the conditional |\ifsdh@floatfits| and the
+% dimension |\@tempdima| to the total float size and |\@tempdimb|
+% to the available space in the column.  We also pay attention to
+% the number of floats and make sure we keep under the total.
+% Finally, we use |\@bitor| to make sure we're not disordering
+% anything that needs to be ordered.
+%    \begin{macrocode}
+\def\sdh@checkfloatsize{%
+  \sdh@floatfitstrue
+  \sdh@debug{checkfloatsize \@currbox}%
+  % Sizes
+  \begingroup
+    \@tempdima\dimexpr\ht\@currbox+\dp\@currbox\relax
+    \@tempdimb\dimexpr\@colroom-\@pageht\relax
+    \sdh@debug{float: \the\@tempdima^^J***space:\the\@tempdimb}%
+    \ifdim\@tempdima>\@tempdimb
+      \aftergroup\sdh@floatfitsfalse
+          \sdh@debug{failed: height}%
+    \fi
+  % Number (for now only count top/bottom - could be separate)
+  % This needs to not happen if we;re on a float page
+  % -> how do we tell if we've run out of text?!?
+  % if no text then pull it OUT of \@botlist and instead put
+  % it in the page...?
+    \ifx\sdh@dofps\sdh@float@h\else % not for here floats!
+      \count@\z@
+      \def\@elt##1{\advance\count@\@ne}\sdh@fl@top\sdh@fl@bottom
+      \ifnum\count@<\floatsperpage\else
+        \ifsdh@floatpage\else
+          \aftergroup\sdh@floatfitsfalse
+          \sdh@debug{failed: count}%
+        \fi
+      \fi
+    \fi
+  % Finally, make sure that we're not messing up the order...
+    \sdh@map\@temp@<-\@fourthoffour\sdh@fl@defer
+    % copied from \@?tryfc
+    \@currtype \count \@currbox
+    \divide\@currtype\@xxxii
+    \multiply\@currtype\@xxxii
+    \@bitor \@currtype \@temp@
+    \if@test\sdh@debug{failed: blocked (\the\@currtype)}\aftergroup\sdh@floatfitsfalse\fi
+  \endgroup
+  %
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@addfloattocolumn}
+% This is the macro that actually adds the box to the column,
+% in the case of |[h]| floats.  It is stolen from \LaTeX's
+% |\@addtocurcol| routine.  After adding it to the column, we
+% move the float from the pending list to the here list.
+%    \begin{macrocode}
+\def\sdh@addfloattocolumn{%
+  \sdh@debug{adding a float to the column: \@currbox}
+  % We're in the output routine already.  If this is an overfull
+  % box, then add margin blockers...
+  % One problem we run into here is that an overflowing [h] float at the
+  % top of a page will be numbered AFTER the left-hand margin figures,
+  % which is confusing.  If we could somehow insert ALL the floats into
+  % the margin float list, giving preference for before/after to even/odd
+  % pages, then we could have a truly ``top-down'' approach to numbering...
+  % but this is a bit tricky.  All we need to do is merge-sort...!
+  \ifdim\wd\@currbox>\columnwidth
+    \sdh@tryfullwidth\@currbox % shift it over if even page
+    \begingroup
+    \edef\@temp@{{%
+        {{\the\@pageht}{\the\dimexpr\@pageht+\ht\@currbox+\dp\@currbox}}%
+    }}% what about skips?
+    \xa\@cons\xa\sdh@marginphantom\@temp@
+    \endgroup
+  \fi
+  % Now actually insert the box
+  \box\@currbox
+  \penalty\interlinepenalty
+  \vskip\intextsep
+  \ifnum\outputpenalty <-\@Mii \vskip-\parskip\fi
+  \sdh@move\@currbox\sdh@fl@pending\sdh@fl@here
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macros}{\sdh@undeferfloat,\sdh@deferfloat}
+% These macros defer and undefer |[h]| floats.  The float stays
+% in pending the whole time, since it gets processed immediately
+% after the page is output.  We could possibly move it to defer
+% and back.  We might want to look for smaller deferred floats that
+% might fit, and that may or likely may not happen here.
+%
+% I'm not sure the best way to deal with this stuff.  Initially we
+% just saved |\@currlist| and then restored it.  But this is bad if
+% we need to defer two |[h]| floats.  The benefit is that  the top
+% and bottom floats don't get put in out of order.  We could instead
+% change the counter saying how many floats we're allowed left to |\z@|.
+% For now we'll forego the other list and just pass it all through the
+% afterpage output list.
+%    \begin{macrocode}
+\def\sdh@undeferfloat#1{%
+  \sdh@debug{undeferring #1}%
+  %\@push\sdh@currlist@deferred#1%
+  %\ifx\@currlist\sdh@currlist@deferred\else
+  %  \sdh@error{Need to afterall: \@currlist vs \sdh@currlist@deferred}\@eha\fi
+  %\global\let\@currlist\sdh@currlist@deferred
+  \@push\@currlist#1%
+  %\global\let\sdh@currlist@deferred\@empty
+  % Maybe we should call \@addtocurcol directly?
+  %\sdh@debug{ currlist=\@currlist}%
+  %\sdh@debug{ pending=\sdh@fl@pending}%
+  \penalty-\@Miv\@tempdima\prevdepth\vbox{}\prevdepth\@tempdima\penalty-\@Miii
+}
+
+\def\sdh@deferfloat{%
+  %% This currently is only used by [h] floats that don't fit.  We should
+  %% probably instead put something into the \@startcolumn code for this...
+  \sdh@debug{deferring a float: \@currbox}%
+  %\sdh@debug{ currlist=\@currlist}%
+  %\sdh@debug{ pending=\sdh@fl@pending}%
+  %\@cons\sdh@currlist@deferred\@currbox
+  %\global\let\sdh@currlist@deferred\@currlist % might not need this at all???
+  %\let\@currlist\@empty
+  \global\sdh@afterpage\xa\xa\xa{% push front for correct order and in front
+    \xa\xa\xa\sdh@undeferfloat\xa\@currbox\the\sdh@afterpage}
+  %\sdh@debug{ afterpage=\the\sdh@afterpage}%
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macro}{\sdh@addpending}
+% This macro is called by |\end@float| after it has already
+% defined |\@captype| and |\@currbox|.  The point is to save
+% the information we collected in |\sdh@ufilist| from 
+% |\refstepcounter|.  We add the float onto the ``inline''
+% list to be dealt with in the OR.  For any float called out
+% with |\@xfloat| this will be the pending list.  It might
+% also be the margin or here lists, but maybe I need to use
+% a mark to ensure the caption was set...?  For now we'll assume
+% it's well-behaved, but we'll try to break it later and then
+% figure out how to fix it.  In particular, there is no |\@currbox|
+% associated with the inline column ones, so maybe we want a
+% mark instead.  They'll be in order, so we can just use the UFI
+% as the mark text?  We'll get the last mark and then stop counting
+% as soon as we hit it.  Is there a chance we'll interfere with
+% somebody else's marks?!  [No - eTeX provides extra marks!]
+% Alternately we could induce a penalty
+% and try to figure out by hand whether the caption will make it
+% onto the current page.  Or just say ``we fixed the floats, so
+% just use that: free captions lead to unspecified behavior''.
+%
+% We put in the width but need it to not expand twice: once for the
+% first |\edef| right here, and then again for the |\edef| in |\@cons|.
+% It finally gets expanded in |\sdh@adjustpendingwidth|, which is called
+% after |\sdh@old@end@float|.
+%    \begin{macrocode}
+\def\sdh@addpending{%
+  \sdh@debug{addpending: \@captype(\@currbox)--\sdh@ufilist}%
+  \begingroup
+  \edef\@temp@{{{\@captype}{\noexpand\noexpand\noexpand\the\wd\@currbox}%
+                {\sdh@ufilist}\@currbox}}%
+  \xa\@cons\sdh@fl@inline{\@temp@}%
+  \endgroup
+  %\sdh@showlists
+}
+\def\sdh@addpending@nocaptype{%
+  \sdh@debug{addpending nocaptype}%
+  \begingroup
+  \edef\@temp@{{{}{\noexpand\noexpand\noexpand\the\wd\@currbox}%
+                {}\@currbox}}%
+  \xa\@cons\sdh@fl@inline{\@temp@}%
+  \endgroup
+  %\sdh@showlists
+}
+\def\sdh@adjustpendingwidth{%
+  %\message{^^J===BEFORE: \sdh@fl@pending}%
+  \begingroup\let\@elt\relax\xdef\sdh@fl@pending{\sdh@fl@pending}\endgroup
+  %\message{^^J===AFTER: \sdh@fl@pending}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\sdh@tryfullwidth}
+% This is a first attempt at getting full-width floats for
+% |[t]| and |[b]|.  It still needs work, since apparently we
+% need to put |\hsize\fullwidth| into the float environment,
+% or else the caption won't be centered properly.  It takes
+% |\@currbox| as input, and use |\c@page| to figure out which
+% direction to go.  We may also want to block the margin here.
+%    \begin{macrocode}
+\def\sdh@tryfullwidth#1{%
+  \sdh@debug{TFW(#1, page \the\c@page): \the\wd#1}%
+  \ifdim\wd#1>\columnwidth
+    \begingroup
+    \@tempdima\dimexpr\textwidth + \marginparsep + \marginparwidth\relax
+    \ifdim\wd#1>\@tempdima
+      \sdh@warning{Float box wider than page width %
+        (\the\wd#1>\the\@tempdima)}
+    \fi\endgroup
+    % We used to have the following in an \else, but that means that
+    % it won't even try to fix it if it's too big.  Now, it just has
+    % the overflow go out to the left instead...
+    \ifodd\c@page\sdh@debug{even page textwidth}\else
+      %\sdh@debug{fullwidth box: \the\wd\@currbox, \the\columnwidth}%
+      \@tempdima\dimexpr \wd#1 - \columnwidth \relax
+      \sdh@debug{moving \the\@tempdima}%
+      \global\setbox#1=\vbox{\moveleft\@tempdima\box#1}% unskip?
+      %\setbox\@currbox\hbox{\hskip-\@tempdima\box\@currbox}%
+    \fi
+  \fi
+}
+ %\let\sdh@tryfullwidth\relax
+%    \end{macrocode}
+% \end{macro}
+%
+% Here are some stubs for dealing with blocks and deferrals.
+%    \begin{macrocode}
+ %% %%%%
+ %% % First assumption: there are no blocks...  ignore ! in fps,
+ %% % fit the float whereever there's space...
+ %% \def\sdh@blocks#1#2{%
+ %%   % pass in two numbers - does #2 block #1?  here we take into
+ %%   % account (a) same float type
+ %% }
+
+ %% \def\sdh@lookforblock#1{%
+ %%   % if #1 is 'h' then a 'b' on the same page blocks, but a 't' doesn't
+ %%   % if #1 is 't' then a 'b' and a 'h' on the same page blocks...?
+ %%   % if #1 is 'b' then only another 'b' blocks?
+ %% }
+
+ %% \def\sdh@bitor#1{%
+ %%   \@testfalse{%
+ %%     \def\fl@float##1{\@xbitor}\@tempcnta #1\relax}}
+%    \end{macrocode}
+%
+% Finish it up
+%    \begin{macrocode}
+\makeatother
+%</package>
+%    \end{macrocode}
+
+% \makeatother
+% \Finale
+%
+%
+% \iffalse
+%
+% The next line of code prevents DocStrip from adding the
+% character table to the generated files(s).
+
+% Removed stuff
+
+\endinput
+%
+% \fi
+%
+%% \CharacterTable
+%%  {Upper-case    \A\B\C\D\E\F\G\H\I\J\K\L\M\N\O\P\Q\R\S\T\U\V\W\X\Y\Z
+%%   Lower-case    \a\b\c\d\e\f\g\h\i\j\k\l\m\n\o\p\q\r\s\t\u\v\w\x\y\z
+%%   Digits        \0\1\2\3\4\5\6\7\8\9
+%%   Exclamation   \!     Double quote  \"     Hash (number) \#
+%%   Dollar        \$     Percent       \%     Ampersand     \&
+%%   Acute accent  \'     Left paren    \(     Right paren   \)
+%%   Asterisk      \*     Plus          \+     Comma         \,
+%%   Minus         \-     Point         \.     Solidus       \/
+%%   Colon         \:     Semicolon     \;     Less than     \<
+%%   Equals        \=     Greater than  \>     Question mark \?
+%%   Commercial at \@     Left bracket  \[     Backslash     \\
+%%   Right bracket \]     Circumflex    \^     Underscore    \_
+%%   Grave accent  \`     Left brace    \{     Vertical bar  \|
+%%   Right brace   \}     Tilde         \~}
+%%
