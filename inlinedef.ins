@@ -1,0 +1,90 @@
+%% inlinedef.dtx
+%% Copyright 2008 Stephen D. Hicks
+%
+% This work may be distributed and/or modified under the
+% conditions of the LaTeX Project Public License, either version 1.3
+% of this license or (at your option) any later version.
+% The latest version of this license is in
+%   http://www.latex-project.org/lppl.txt
+% and version 1.3 or later is part of all distributions of LaTeX
+% version 2005/12/01 or later.
+%
+% This work has the LPPL maintenance status `maintained'.
+%
+% The Current Maintainer of this work is Stephen D. Hicks
+%
+% This work consists of the files
+%   README
+%   inlinedef.dtx
+%   inlinedef.ins (this file)
+%   inlinedef.pdf
+% and the derived files
+%   inlinedef.sty
+%   inlinetest.tex
+%
+% Run LaTeX on this file to produce the package.
+% Run LaTeX on the .dtx file to produce documentation.
+
+\input docstrip.tex
+\keepsilent
+
+\preamble
+
+Copyright 2008 Stephen D. Hicks <sdh33@cornell.edu>.
+
+This program may be distributed and/or modified under the
+conditions of the LaTeX Project Public License, either version 1.3
+of this license or (at your option) any later version.
+The latest version of this license is in
+  http://www.latex-project.org/lppl.txt and
+version 1.3 or later is part of all distributions of LaTeX
+version 2005/12/01 or later.
+
+This work has the LPPL maintenance status `maintained'.
+
+The Current Maintainer of this work is Stephen D. Hicks
+
+This work consists of the files
+  README
+  inlinedef.dtx
+  inlinedef.ins
+  inlinedef.pdf
+and the derived files
+  inlinedef.sty
+  inlinetest.tex
+
+Any modified versions of this file must be renamed
+with new filenames distinct from those in this work.
+
+This generated file may be distributed as long as the
+original source files, as listed above, are part of the
+same distribution. (The sources need not necessarily be
+in the same archive or directory.)
+
+\endpreamble
+
+
+%\askonceonly
+\generate{
+    %\askforoverwritefalse
+    \file{inlinedef.sty}{\from{inlinedef.dtx}{package}}}
+\generate{%
+    %\askforoverwritefalse
+    \file{inlinetest.tex}{\from{inlinedef.dtx}{testsuite}}}
+
+ \Msg{************************************************************}
+ \Msg{}
+ \Msg{ To finish the installation you have to move the file}
+ \Msg{ `inlinedef.sty' into a directory searched by LaTeX.}
+ \Msg{}
+ \Msg{ To type-set the documentation, run the file `inlinedef.dtx'}
+ \Msg{ through LaTeX.}
+ \Msg{ Process inlinedef.idx file by:}
+ \Msg{ \space\space\space\space makeindex -s gind.ist inlinedef}
+% \Msg{ Process inlinedef.glo file by:}
+% \Msg{ \space\space\space\space makeindex -s gglo.ist -o inlinedef.gls inlinedef.glo}
+ \Msg{}
+ \Msg{************************************************************}
+
+
+\endbatchfile

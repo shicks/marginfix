@@ -196,6 +196,12 @@
 % does not suffer from the problem that \Lopt{mparhack} was designed to
 % fix and it is therefore incompatible.
 %
+% \subsection{placeins}
+% We borrow the |\FloatBarrier| concept from |placeins| in our
+% |\dumpfloats| command.  Obviously |placeins| will no longer work,
+% along with most other float-oriented packages, since we've changed
+% so much of the float code.
+%
 % \subsection{Multiple columns}
 % So far, multiple double (or more) columns are not supported.  Attempts
 % to insert floats while in double-column mode will result in undefined
