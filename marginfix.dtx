@@ -330,10 +330,35 @@
 % \begin{macros}{\MFX@getypos,\mfx@ypos}
 % We now need to settle on a way to determine the vertical position.
 % Ultimately this will be an option, and will depend on a variety
-% of factors.  But for starters, we define the simplest version:
+% of factors.  But for starters, we define the simplest version.
+% Note the subtraction of \cs{Mfx@strutheight}.  Ideally we would simply
+% grab a copy of \cs{@holdpg} from the middle of \cs{@specialoutput}
+% and then discard the last box to figure out what height we're really
+% at, since \cs{@holdpg} includes the box from the line we're currently
+% on, and we want to be level with the \emph{top} of that box, rather
+% than the baseline.  But since \cs{@holdpg} is accessible only deep
+% within \cs{@specialoutput}, and it's not worth the risky job of
+% performing surgery on it (which is unfortunately brittle if anyone
+% else has a similar idea), we instead resort to this approximation.
+% And since this will ultimately be only a fallback for when
+% \cs{pdflastypos} isn't available, it should be good enough.
 %    \begin{macrocode}
 \def\MFX@getypos{%
-  \edef\mfx@ypos{\the\@pageht}%
+  \edef\mfx@ypos{\the\dimexpr\@pageht-\Mfx@strutheight\relax}%
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\marginpar,\Mfx@strutheight}
+% We need to make sure \cs{\Mfx@strutheight} gets defined somewhere,
+% and the best time is probably right before the \cs{marginpar} does
+% its work, since that will most likely ensure we're using the right
+% font for the line.
+%    \begin{macrocode}
+\newdimen\Mfx@strutheight
+\edef\marginpar{%
+  \unexpanded{\setbox\@tempboxa\hbox{\strut}\Mfx@strutheight\ht\@tempboxa}%
+  \expandafter\unexpanded\expandafter{\marginpar}%
 }
 %    \end{macrocode}
 % \end{macros}
@@ -361,11 +386,30 @@
 % \end{macros}
 %
 % \begin{macros}{\MFX@attachmargin}
-% We'll start with the second half of \cs{MFX@precombine}, since it's
-% simpler.
+% We'll start with the second half of \cs{MFX@combinefloats@before},
+% since it's simpler.  We need to do several things here.
 %    \begin{macrocode}
 \def\MFX@attachmargin{%
 %<debug>\MFX@debug{attachmargin: ENTRY}%
+%    \end{macrocode}
+% First, we need to make sure that the boxes we're combining are the
+% same size.
+%    \begin{macrocode}
+  \ifdim\ht\@outputbox<\ht\Mfx@marginbox
+    \setbox\@outputbox\vbox to \ht\Mfx@marginbox{%
+      \box\@outputbox
+      \vfill
+    }%
+  \else
+    \setbox\Mfx@marginbox\vbox to \ht\@outputbox{%
+      \unvbox\Mfx@marginbox
+      \vfill
+    }%
+  \fi
+%    \end{macrocode}
+% Next we need to figure out which side of \cs{@outputbox} to attach
+% the \cs{Mfx@marginbox} on.
+%    \begin{macrocode}
   \setbox\@outputbox\vbox to \ht\@outputbox{%
     \hbox to \wd\@outputbox{%
       \ifodd\c@page
@@ -459,7 +503,7 @@
     \MFX@snoc\mfx@marginout{\noexpand\mfx@margin@compressible{\the\dimen@}}%
   \fi
   \MFX@whichbox#1#2%
-  \advance\Mfx@marginboxspace\ht\@marbox\relax
+  \advance\Mfx@marginboxspace\dimexpr\ht\@marbox+\dp\@marbox\relax
   \ifdim\Mfx@marginboxspace>\Mfx@marginheight
 %    \end{macrocode}
 % We've run out of margin space, so we now defer every following box,
@@ -469,7 +513,7 @@
 %    \begin{macrocode}
 %<debug>\MFX@debug{note@down: out of space:
 %<debug>    \the\Mfx@marginboxspace>\the\Mfx@marginheight}%
-    \advance\Mfx@marginboxspace-\ht\@marbox\relax
+    \advance\Mfx@marginboxspace\dimexpr-\ht\@marbox-\dp\@marbox\relax
     \mfx@margin@clear
     \mfx@margin@note#1#2{\z@}%
   \else
@@ -478,7 +522,8 @@
 % arrange for the boxes to be freed and then add the correct box to the
 % output list.
 %    \begin{macrocode}
-%<debug>\MFX@debug{note@down: adding \@marbox}%
+%<debug>\MFX@debug{note@down: adding \@marbox 
+%<debug>    ht \the\ht\@marbox dp \the\dp\@marbox}%
     \advance\Mfx@marginpos#3\relax
     \MFX@snoc\mfx@marginout{%
       \noexpand\mfx@margin@note\@marbox
@@ -633,11 +678,14 @@
 % gets called \cs{AtEndDocument}.  Since we're looping to do this,
 % we need to make darned sure that every \cs{newpage} shrinks the
 % marginlist.
+% \begin{macros}{\dumpmargins}
+%    \begin{macrocode}
 \def\dumpmargins{%
+%<debug>\MFX@debug{dumpmargins: ENTRY}%
   \loop
   \unless\ifx\mfx@marginlist\@empty
     \let\temp@\mfx@marginlist
-    \newpage
+    \vbox{}\clearpage
     \ifx\temp@\mfx@marginlist
       \PackageError{marginfix}{lost some margin notes%
 %<debug>: \meaning\mfx@marginlist
@@ -647,6 +695,9 @@
   \repeat
 }
 \AtEndDocument{\dumpmargins}
+%    \end{macrocode}
+% \end{macros}
+%
 % \section{Random scribbles}
 %
 % Later we'll get fancier with putting notes next to top/bottom
