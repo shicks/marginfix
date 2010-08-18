@@ -12,7 +12,7 @@
 %
 %<package>\NeedsTeXFormat{LaTeX2e}
 %<package>\ProvidesPackage{marginfix}%
-           [2010/07/29 v2.0 Fix Margin Paragraphs]
+           [2010/08/17 v1.0 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
 %\OnlyDescription % (un)comment this line to show (hide) source code
@@ -173,6 +173,13 @@
 % we must maintain a dimension for the height of the current margin.
 %    \begin{macrocode}
 \newdimen\Mfx@marginheight
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\Mfx@mparshift}
+% We store the current shift in a dimension register.
+%    \begin{macrocode}
+\newdimen\Mfx@mparshift
 %    \end{macrocode}
 % \end{macros}
 %
@@ -344,13 +351,14 @@
 % \cs{pdflastypos} isn't available, it should be good enough.
 %    \begin{macrocode}
 \def\MFX@getypos{%
-  \edef\mfx@ypos{\the\dimexpr\@pageht-\Mfx@strutheight\relax}%
+  \edef\mfx@ypos{\the\dimexpr\@pageht-\Mfx@strutheight+\Mfx@mparshift\relax}%
+  \global\Mfx@mparshift\z@
 }
 %    \end{macrocode}
 % \end{macros}
 %
 % \begin{macros}{\marginpar,\Mfx@strutheight}
-% We need to make sure \cs{\Mfx@strutheight} gets defined somewhere,
+% We need to make sure \cs{Mfx@strutheight} gets defined somewhere,
 % and the best time is probably right before the \cs{marginpar} does
 % its work, since that will most likely ensure we're using the right
 % font for the line.
@@ -376,11 +384,14 @@
 % 
 % \cs{MFX@combinefloats@before} is then responsible for picking the
 % needed notes from \cs{mfx@marginlist}, building them into a box, and
-% attaching said box onto the correct side of \cs{@outputbox}.
+% attaching said box onto the correct side of \cs{@outputbox}.  This is
+% also a convenient place to reset \cs{Mfx@marginheight} to zero (since
+% we reuse the register for one-time extensions).
 %    \begin{macrocode}
 \def\MFX@combinefloats@before{%
   \MFX@buildmargin
   \MFX@attachmargin
+  \Mfx@marginheight\z@
 }
 %    \end{macrocode}
 % \end{macros}
@@ -390,7 +401,7 @@
 % since it's simpler.  We need to do several things here.
 %    \begin{macrocode}
 \def\MFX@attachmargin{%
-%<debug>\MFX@debug{attachmargin: ENTRY}%
+%<debug>\MFX@debug{attachmargin}%
 %    \end{macrocode}
 % First, we need to make sure that the boxes we're combining are the
 % same size.
@@ -438,7 +449,7 @@
 % don't encroach on the margin, but that will be tricky...
 %    \begin{macrocode}
 \def\MFX@buildmargin{%
-  \Mfx@marginheight\@colroom
+  \advance\Mfx@marginheight\@colroom
 %<debug>\MFX@debug{buildmargin: marginheight=\the\Mfx@marginheight}%
   \MFX@buildmargin@down
   \MFX@buildmargin@up
@@ -608,7 +619,7 @@
 % Note that there are no clears in \cs{mfx@marginout}.
 %    \begin{macrocode}
 \def\MFX@buildmargin@up{%
-%<debug>\MFX@debug{buildmargin@up: ENTRY, excess=\the\dimexpr
+%<debug>\MFX@debug{buildmargin@up: excess=\the\dimexpr
 %<debug>           \Mfx@marginpos-\Mfx@marginheight\relax}%
 %<debug>\MFX@debug{marginout=\meaning\mfx@marginout}
   \let\mfx@margin@note\MFX@margin@note@up
@@ -692,7 +703,7 @@
 % \begin{macros}{\dumpmargins}
 %    \begin{macrocode}
 \def\dumpmargins{%
-%<debug>\MFX@debug{dumpmargins: ENTRY}%
+%<debug>\MFX@debug{dumpmargins}%
   \loop
   \unless\ifx\mfx@marginlist\@empty
     \let\temp@\mfx@marginlist
@@ -738,12 +749,30 @@
 %    \end{macrocode}
 % \end{macros}
 %
-
+% \begin{macros}{\extendmargin}
+% We overload \cs{Mfx@marginheight} to be the amount of extension
+% at all times except shipout-time.
+%    \begin{macrocode}
+\def\extendmargin#1{%
+  \advance\Mfx@marginheight#1\relax
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\mparshift}
+% This is as simple as setting the dimen register.  We advance so that
+% the shifts are cumulative, but there's not really any point either way.
+%    \begin{macrocode}
+\def\mparshift#1{%
+  \advance\Mfx@mparshift#1\relax
+}
+%    \end{macrocode}
+% \end{macros}
+%
 % \section{Random scribbles}
 %
 % Later we'll get fancier with putting notes next to top/bottom
 % figures but for now, not so much.
-%
 %
 % In the future we will support the use of \cs{pdfsavepos} and
 % \cs{pdflastypos} for more accurately determining where the callouts
