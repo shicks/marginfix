@@ -431,10 +431,15 @@
 % removed, and leaving only notes that were deferred to the next
 % page.  Additionally, \cs{Mfx@marginbox} must contain a
 % box the same height as \cs{@outputbox}.  We do this in several
-% steps.
+% steps.  We start with a height of \cs{@colroom} rather than
+% \cs{textheight} because \cs{@colroom} has already subtracted
+% off the top/bottom floats that have been set.  Eventually we
+% will want to encroach on these floats, particularly if they
+% don't encroach on the margin, but that will be tricky...
 %    \begin{macrocode}
 \def\MFX@buildmargin{%
-  \Mfx@marginheight\textheight
+  \Mfx@marginheight\@colroom
+%<debug>\MFX@debug{buildmargin: marginheight=\the\Mfx@marginheight}%
   \MFX@buildmargin@down
   \MFX@buildmargin@up
 }
@@ -501,6 +506,7 @@
     \dimen@\dimexpr#3-\Mfx@marginpos\relax
 %<debug>\MFX@debug{note@down: adding compressible \the\dimen@}%
     \MFX@snoc\mfx@marginout{\noexpand\mfx@margin@compressible{\the\dimen@}}%
+    \advance\Mfx@marginpos\the\dimen@
   \fi
   \MFX@whichbox#1#2%
   \advance\Mfx@marginboxspace\dimexpr\ht\@marbox+\dp\@marbox\relax
@@ -524,7 +530,7 @@
 %    \begin{macrocode}
 %<debug>\MFX@debug{note@down: adding \@marbox 
 %<debug>    ht \the\ht\@marbox dp \the\dp\@marbox}%
-    \advance\Mfx@marginpos#3\relax
+    \advance\Mfx@marginpos\dimexpr\ht\@marbox+\dp\@marbox\relax
     \MFX@snoc\mfx@marginout{%
       \noexpand\mfx@margin@note\@marbox
       \noexpand\@cons\noexpand\@freelist#1%
@@ -532,6 +538,8 @@
     }%
   \fi
   \let\mfx@margin@skip\MFX@margin@skip@down
+%<debug>\MFX@debug{note@down: RETURN space=\the\Mfx@marginboxspace,
+%<debug>           pos=\the\Mfx@marginpos}%
 }
 %    \end{macrocode}
 %
@@ -542,6 +550,7 @@
 \def\MFX@margin@skip@down#1{%
 %<debug>\MFX@debug{skip@down #1}%
   \advance\Mfx@marginpos#1\relax
+  \advance\Mfx@marginboxspace#1\relax
   \MFX@snoc\mfx@marginout{\noexpand\mfx@margin@skip{#1}}%
 }
 %    \end{macrocode}
@@ -583,7 +592,7 @@
   \else
     \def\@marbox{#2}%
   \fi
-%<debug>\MFX@debug{whichbox: RETURN \@marbox}%
+%<debug>\MFX@debug{whichbox: \@marbox}%
 }
 %    \end{macrocode}
 % \end{macros}
@@ -599,8 +608,9 @@
 % Note that there are no clears in \cs{mfx@marginout}.
 %    \begin{macrocode}
 \def\MFX@buildmargin@up{%
-%<debug>\MFX@debug{buildmargin@up: ENTRY:
-%<debug>     marginout=\meaning\mfx@marginout}%
+%<debug>\MFX@debug{buildmargin@up: ENTRY, excess=\the\dimexpr
+%<debug>           \Mfx@marginpos-\Mfx@marginheight\relax}%
+%<debug>\MFX@debug{marginout=\meaning\mfx@marginout}
   \let\mfx@margin@note\MFX@margin@note@up
   \let\mfx@margin@compressible\MFX@margin@skip@gobble@up
   \let\mfx@margin@skip\MFX@margin@skip@gobble@up
@@ -653,7 +663,8 @@
 % we need to excise.  If also updates \cs{Mfx@marginpos}.
 %    \begin{macrocode}
 \def\MFX@margin@compressible@up#1{%
-%<debug>\MFX@debug{compressible@up: #1}%
+%<debug>\MFX@debug{compressible@up: #1, excess=\the\dimexpr
+%<debug>           \Mfx@marginpos-\Mfx@marginheight\relax}%
   \dimen@#1\relax
   \ifdim\Mfx@marginpos>\Mfx@marginheight
     \advance\dimen@\dimexpr\Mfx@marginheight-\Mfx@marginpos\relax
@@ -698,6 +709,36 @@
 %    \end{macrocode}
 % \end{macros}
 %
+% \section{User macros}
+%
+% \begin{macros}{\marginskip}
+% Inserting a skip in the margin list is simple.  We need only
+% append \cs{mfx@margin@skip} to \cs{mfx@marginlist}.
+%    \begin{macrocode}
+\def\marginskip#1{%
+  \MFX@cons\mfx@marginlist{\noexpand\mfx@margin@skip{#1}}%
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\clearmargin,\softclearmargin}
+% Likewise, \cs{clearmargin} is easy too.
+%    \begin{macrocode}
+\def\clearmargin{%
+  \MFX@cons\mfx@marginlist{\noexpand\mfx@margin@clear}%
+}
+%    \end{macrocode}
+% While we call \cs{softclearmargin} a ``clear margin'', it's
+% actually just a big \cs{marginskip}.  This allows us to stack
+% multiple copies without backing them all up.
+%    \begin{macrocode}
+\def\softclearmargin{%
+  \marginskip{\the\textheight}%
+}
+%    \end{macrocode}
+% \end{macros}
+%
+
 % \section{Random scribbles}
 %
 % Later we'll get fancier with putting notes next to top/bottom
