@@ -183,6 +183,24 @@
 %    \end{macrocode}
 % \end{macros}
 %
+% \section{User-configurable dimensions}
+% We export a few dimensions that the user can redefine to tweak behavior.
+% \begin{macros}{\marginheightadjustment}
+% This length will be added to the total margin height of each page
+% (the default is zero).
+%    \begin{macrocode}
+\newdimen\marginheightadjustment
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\marginposadjustment}
+% We will offset each margin note from its callout location by this length
+% (the default is zero).
+%    \begin{macrocode}
+\newdimen\marginposadjustment
+%    \end{macrocode}
+% \end{macros}
+%
 % \section{Plan of attack}
 % \subsection{\cs{marginpar}}
 % The default sequence of events for a \cs{marginpar} is roughly the following
@@ -351,7 +369,9 @@
 % \cs{pdflastypos} isn't available, it should be good enough.
 %    \begin{macrocode}
 \def\MFX@getypos{%
-  \edef\mfx@ypos{\the\dimexpr\@pageht-\Mfx@strutheight+\Mfx@mparshift\relax}%
+  \edef\mfx@ypos{%
+    \the\dimexpr\@pageht - \Mfx@strutheight
+       + \marginposadjustment + \Mfx@mparshift\relax}%
   \global\Mfx@mparshift\z@
 }
 %    \end{macrocode}
@@ -391,7 +411,7 @@
 \def\MFX@combinefloats@before{%
   \MFX@buildmargin
   \MFX@attachmargin
-  \Mfx@marginheight\z@
+  \Mfx@marginheight\marginheightadjustment
 }
 %    \end{macrocode}
 % \end{macros}
