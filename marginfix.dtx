@@ -79,7 +79,25 @@
 % \subsection{memoir}
 % \subsection{mparhack}
 % \subsection{Multiple columns}
-% \section{Possible improvements}
+% \section{Coming attractions}
+% Here is a list of things to possibly look forward to in a future version.
+% If any of them are particularly important, please let me know.
+% \begin{itemize}
+% \item Margin phantoms.
+% \item Use of pdf\TeX's \cs{pdfsavepos} and \cs{pdflastypos} for more
+%   accurate margin placement.
+% \item Better interaction with floats.
+%   \iffalse
+%   We can set a default one way
+%   or the other and then allow a macro to override it (presumably with a
+%   CS defined in terms of the box name/meaning, so as not to get in the
+%   way of \LaTeX's use of the insert registers).  We would then add or
+%   not add phantoms in the right spots.  We'd also need to shift all the
+%   callout points by the size of the top figures (unless we're using
+%   \cs{pdfsavepos}).
+%   \fi
+% \end{itemize}
+%
 % \StopEventually{}
 %
 % \makeatletter
@@ -367,6 +385,7 @@
 % else has a similar idea), we instead resort to this approximation.
 % And since this will ultimately be only a fallback for when
 % \cs{pdflastypos} isn't available, it should be good enough.
+% NOTE: we might be able to use a \cs{vadjust} instead here?
 %    \begin{macrocode}
 \def\MFX@getypos{%
   \edef\mfx@ypos{%
@@ -552,7 +571,7 @@
 %<debug>    \the\Mfx@marginboxspace>\the\Mfx@marginheight}%
     \advance\Mfx@marginboxspace\dimexpr-\ht\@marbox-\dp\@marbox\relax
     \mfx@margin@clear
-    \mfx@margin@note#1#2{\z@}%
+    \mfx@margin@note#1#2{#3}%
   \else
 %    \end{macrocode}
 % At this point, the box is definitely going onto this page, so we can
@@ -594,12 +613,21 @@
 \def\MFX@margin@clear@down{%
 %<debug>\MFX@debug{clear@down}%
   \def\mfx@margin@note##1##2##3{%
-    \MFX@cons\mfx@marginlist{\noexpand\mfx@margin@note##1##2{##3}}}%
+    \MFX@cons\mfx@marginlist{\noexpand\mfx@margin@note##1##2{\MFX@minus@inf}}}%
   \def\mfx@margin@skip##1{%
     \MFX@cons\mfx@marginlist{\noexpand\mfx@margin@skip{##1}}}%
   \def\mfx@margin@clear{%
     \MFX@cons\mfx@marginlist{\noexpand\mfx@margin@clear}}%
 }
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\MFX@minus@inf}
+% Note that when we added deferred boxes to the list, we put them
+% at \cs{MFX@minus@inf}.  We'll define that to be a large negative
+% dimension.
+%    \begin{macrocode}
+\def\MFX@minus@inf{-4000pt}
 %    \end{macrocode}
 % \end{macros}
 %
