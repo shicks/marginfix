@@ -1,0 +1,33 @@
+MARGINFIX -- Fixes LaTeX's margin notes
+
+AUTHOR
+  Stephen D. Hicks is the author of inlinedef
+  email: sdh33@cornell.edu
+
+COPYRIGHT
+  This program is provided under the terms of the
+  LaTeX Project Public License distributed from CTAN
+  archives in the directory macros/latex/base/lppl.txt.
+  Copyright 2010 Stephen D. Hicks
+
+INSTALLATION
+  Run `latex marginfix.ins' and copy the marginfix.sty file into a
+  path searched by LaTeX.
+
+DESCRIPTION
+  Authors using LaTeX to typeset books with significant margin
+  material often run into the problem of long notes running off the
+  bottom of the page. A typical workaround is to insert \vshift
+  commands by hand, but this is a tedious process that is invalidated
+  when pagination changes. Another workaround is memoir's \sidebar
+  function, but this can be unsatisfying for short textual notes, and
+  standard marginpars cannot be mixed with sidebars. This package
+  implements a solution to make marginpars "just work" by keeping a
+  list of floating inserts and arranging them intelligently in the
+  output routine.
+
+FILES
+  README          This file
+  marginfix.dtx   Source code and documentation
+  marginfix.ins   Installation script generating source and tests
+  marginfix.pdf	  PDF version of the documentation

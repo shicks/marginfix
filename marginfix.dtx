@@ -12,7 +12,7 @@
 %
 %<package>\NeedsTeXFormat{LaTeX2e}
 %<package>\ProvidesPackage{marginfix}%
-           [2010/08/17 v1.0 Fix Margin Paragraphs]
+           [2010/08/18 v0.9 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
 %\OnlyDescription % (un)comment this line to show (hide) source code
@@ -46,56 +46,116 @@
 \end{document}
 %</driver>
 % \fi
-% \changes{v1.0}{2008/03/21}
+% \changes{v0.9}{2010/08/18}
 %       {(SDH) Initial version.}
-% \changes{v1.1}{2008/03/31}
-%       {(SDH) First completely-working version.}
-% \changes{v1.1.1}{2008/04/07}
-%       {(SDH) Add marginskip as complement to -sep and -shift.}
-% \changes{v1.2}{2008/06/02}
-%       {(SDH) Float page support, etc.}
-% \changes{v1.2.1}{2008/06/04}
-%       {(SDH) Work on tryfullwidth, integrate with float pages.}
-% \changes{v1.2.2}{2008/07/03}
-%       {(SDH) Many changes.}
-% \changes{v1.2.3}{2008/12/09}
-%       {(SDH) Fix a bug that cuased floats to get delayed.}
-% \changes{v2.0}{2010/07/29}
-%       {(SDH) Clean up for CTAN, remove floats entirely.}
 %
 % \GetFileInfo{marginfix.dtx}
-% \title{|marginfix| package documentation}
-% \author{Stephen Hicks}
+% \title{\Lopt{marginfix} package documentation}
+% \author{Stephen Hicks\\\texttt{http://shicks.github.com/marginfix}}
 % \date{\fileversion{} -- \filedate}
 % \maketitle
 %
 % \part*{Usage}
-%
 % \section{Overview}
+% Authors using \LaTeX\ to typeset books with significant margin material
+% often run into the problem of long notes running off the bottom of the
+% page.  A typical workaround is to insert \cs{vshift}s by hand, but
+% this is a tedious process that is invalidated when pagination changes.
+% Another workaround is \pkg{memoir}'s \cs{sidebar} function, but this can be
+% unsatisfying for short textual notes, and standard marginpars cannot
+% be mixed with sidebars.  This package implements a solution to
+% make marginpars "just work" by keeping a list of floating inserts and
+% arranging them intelligently in the output routine.
+%
 % \section{Options}
+% There are currently no options that do anything yet.
+%
 % \section{Commands}
+% For the most part, this is a drop-in replacement.  Simply add
+% |\usepackage{marginfix}| to the preamble, use \cs{marginpar}
+% normally and hope for the best.
+% In the event, however, that it doesn't work exactly as hoped,
+% there are a number of tweaks that the user can apply.
+%
+% \DescribeMacro{\marginskip}
+% Calling \cs{marginskip}\marg{length} will insert an incompressible
+% skip in the margin.  These skips will force neighboring notes on
+% the same page to be separated, but will disappear at the top or
+% bottom of a margin.
+%
+% \DescribeMacro{\clearmargin}\DescribeMacro{\softclearmargin}
+% In an analog to \cs{clearpage}, \cs{clearmargin} prevents any further
+% material from being added to the current margin.  These calls are
+% cumulative, so that two \cs{clearmargin}s in a row will produce a
+% completely empty margin on the next page as well.  If this is not
+% the desired effect, use \cs{softclearmargin}, which is effectively
+% idempotent: multiple calls have the same effect as one call to
+% end the current margin.
+%
+% \DescribeMacro{\extendmargin}
+% If a page has too much margin material to fit and an important note
+% is floating to the next page, \cs{extendmargin}\marg{length} will
+% extend the margin (for the current page only) by the given length.
+% If the length is negative, the margin will shrink.  Multiple calls
+% on the same page are cumulative.
+%
+% \DescribeMacro{\mparshift}
+% To adjust the position of a single note, use \cs{mparshift}\marg{length}
+% before \cs{marginpar}.  Positive lengths move it down the page.  This
+% essentially shifts the call-out location, so the actual position of the
+% note might not change if the margin is sufficiently crowded.
+% Multiple calls before the same note are cumulative.
+%
+% \DescribeMacro{\marginheightadjustment}
+% If all the margins are the wrong size, the height of the margin on every
+% page can be adjusted by assigning a non-zero value to the dimension
+% register \cs{marginheightadjustment} (as in 
+% \cs{marginheightadjustment}\texttt{=}$\langle$\emph{length}$\rangle$).
+% This is effectively the same as a call to
+% \cs{extendmargin} on every page.
+%
+% \DescribeMacro{\marginposadjustment}
+% Similarly, if all the margins are in the wrong place, the callout
+% positions can be adjusted by assigning a non-zero value to the dimension
+% register \cs{marginposadjustment}.  This is effectively the same as a call
+% to \cs{mparshift} before every note.  This is particularly useful at
+% present because the height of the line on which the margin note is called
+% is currently only estimated, and appears to be off by a point or two.
+% This may get fixed in the future, but until then, the adjustment is
+% possibly the easiest workaround.
+%
 % \section{Interaction with other packages}
-% \subsection{morefloats}
 % \subsection{memoir}
+% There are no known issues with \Lopt{memoir} at present, provided that
+% \cs{sidebar} is not used.
+%
 % \subsection{mparhack}
+% \Lopt{mparhack} was designed to deal with the problem of margin notes
+% showing up in the wrong margin because the left/right was decided before
+% it was known exactly which page the note would be on.  Because we defer
+% this decision to shipout time in this package, we are not susceptible
+% to this problem, so \Lopt{mparhack} is no longer needed and should not
+% be included (though I'm unaware whether it causes any actual problems).
+%
 % \subsection{Multiple columns}
-% \section{Coming attractions}
+% There is currently no support for multiple columns.
+%
+% \section{Coming attractions and known issues}
 % Here is a list of things to possibly look forward to in a future version.
 % If any of them are particularly important, please let me know.
 % \begin{itemize}
 % \item Margin phantoms.
 % \item Use of pdf\TeX's \cs{pdfsavepos} and \cs{pdflastypos} for more
 %   accurate margin placement.
+% \item \cs{vadjust} to correct inconsistencies with \cs{@pageht}.
 % \item Better interaction with floats.
-%   \iffalse
-%   We can set a default one way
+%   (We can set a default one way
 %   or the other and then allow a macro to override it (presumably with a
 %   CS defined in terms of the box name/meaning, so as not to get in the
 %   way of \LaTeX's use of the insert registers).  We would then add or
 %   not add phantoms in the right spots.  We'd also need to shift all the
 %   callout points by the size of the top figures (unless we're using
-%   \cs{pdfsavepos}).
-%   \fi
+%   \cs{pdfsavepos}).)
 % \end{itemize}
 %
 % \StopEventually{}
