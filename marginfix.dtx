@@ -12,10 +12,10 @@
 %
 %<package>\NeedsTeXFormat{LaTeX2e}
 %<package>\ProvidesPackage{marginfix}%
-           [2010/08/18 v0.9 Fix Margin Paragraphs]
+           [2010/08/28 v0.9.1 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
-\CheckSum{529}
+\CheckSum{546}
 %\OnlyDescription % (un)comment this line to show (hide) source code
 \RecordChanges
 \EnableCrossrefs
@@ -51,6 +51,8 @@
 %       {(SDH) Initial version of floatprobsbegone.}
 % \changes{v0.9}{2010/08/18}
 %       {(SDH) Initial CTAN version.}
+% \changes{v0.9.1}{2010/08/28}
+%       {(SDH) Fix bug where we alternated sides in article.}
 %
 % \GetFileInfo{marginfix.dtx}
 % \title{\Lopt{marginfix} package documentation}
@@ -525,12 +527,12 @@
 %    \begin{macrocode}
   \setbox\@outputbox\vbox to \ht\@outputbox{%
     \hbox to \wd\@outputbox{%
-      \ifodd\c@page
-        \box\@outputbox
-        \rlap{\hskip\marginparsep\box\Mfx@marginbox}%
-      \else
+      \if\MFX@leftmargin
         \llap{\box\Mfx@marginbox\hskip\marginparsep}%
         \box\@outputbox
+      \else
+        \box\@outputbox
+        \rlap{\hskip\marginparsep\box\Mfx@marginbox}%
       \fi
   }}%
 }
@@ -592,7 +594,8 @@
 %
 % We must now define the different meanings for the
 % |\mfx@margin@...| macros.
-% \begin{macros}{\mfx@margin@note@down,\mfx@margin@skip@down,\mfx@margin@clear@down}
+% \begin{macros}{\MFX@margin@note@down,\MFX@whichbox,%
+%     \MFX@margin@skip@down,\MFX@margin@clear@down}
 % We'll dive right into the notes first.  When we see a note in the
 % \cs{marginlist}, we need to do several things.
 % \begin{enumerate}
@@ -656,6 +659,20 @@
 }
 %    \end{macrocode}
 %
+% We need to figure out which box to set.  This macro calls
+% \cs{MFX@leftmargin} and then sets the correct box into
+% \cs{@marbox} for use by \cs{MFX@margin@box@down}.
+%    \begin{macrocode}
+\def\MFX@whichbox#1#2{%
+  \if\MFX@leftmargin
+    \def\@marbox{#1}%
+  \else
+    \def\@marbox{#2}%
+  \fi
+%<debug>\MFX@debug{whichbox: \@marbox}%
+}
+%    \end{macrocode}
+%
 % The next macro we'll write is the skip.  This one just has to save itself
 % onto whichever list we're working on (output or deferred) and in the case
 % of output, update \cs{@Mfx@marginpos}.
@@ -694,27 +711,31 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@whichbox}
-% Here we figure out which box to use based on the page number, and
-% sets the correct box in \cs{@marbox}.  This is different from the
-% corresponding code in the {\LaTeX} routines because, first, we don't
-% support double columns, and second, the action of
-% \cs{if@reversemargin} is at callout-time, while this is run at
-% shipout-time.  These both make this a simpler routine.
+% \begin{macros}{\MFX@leftmargin}
+% Here we figure out which box to use based on the page number and
+% other flags.  This is a conditional that should be used after
+% \cs{if}, as in \cs{if}\cs{MFX@leftmargin}\ldots\cs{else}\ldots\cs{fi}.
+%
+% This is different from the corresponding code in the {\LaTeX}
+% routines because we don't support double columns.  In addition, we
+% would ideally allow \cs{if@reversemargin} to work on a per-note
+% basis (i.e. at callout time) but we also need something working at
+% shipout time so we can figure out which margin to use.  Thus, until
+% we figure out how to use multiple margins.
 %    \begin{macrocode}
-\def\MFX@whichbox#1#2{
+\def\MFX@leftmargin{%
+  00\fi % close out the \if
   \@tempcnta\@ne
   \if@mparswitch
     \unless\ifodd\c@page
       \@tempcnta\m@ne
     \fi
   \fi
-  \ifnum\@tempcnta<\z@
-    \def\@marbox{#1}%
-  \else
-    \def\@marbox{#2}%
+  \if@reversemargin
+    \@tempcnta-\@tempcnta
   \fi
-%<debug>\MFX@debug{whichbox: \@marbox}%
+%<debug>\MFX@debug{margin on \ifnum\@tempcnta<\z@ left\else right\fi}%
+  \ifnum\@tempcnta<\z@ % start a new \if
 }
 %    \end{macrocode}
 % \end{macros}
@@ -824,6 +845,7 @@
 %<debug>: \meaning\mfx@marginlist
       }\@eha
       \let\mfx@marginlist\@empty % be nicer by just dropping one?
+      % TODO: also, set an emergency mode to allow oversized notes
     \fi
   \repeat
 }
