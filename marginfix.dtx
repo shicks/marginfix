@@ -12,7 +12,7 @@
 %
 %<package>\NeedsTeXFormat{LaTeX2e}
 %<package>\ProvidesPackage{marginfix}%
-           [2010/08/28 v0.9.1 Fix Margin Paragraphs]
+           [2013/09/01 v1.0 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
 \CheckSum{546}
@@ -53,6 +53,14 @@
 %       {(SDH) Initial CTAN version.}
 % \changes{v0.9.1}{2010/08/28}
 %       {(SDH) Fix bug where we alternated sides in article.}
+% \changes{v1.0}{2013/09/01}
+%       {(Dario Buttari) Alternate order of \cs{marginpar} arguments to be
+%        consistent with the original macro.}
+% \changes{v1.0}{2013/09/01}
+%       {(Dario Buttari) Fix bug in deferred note spacing.}
+% \changes{v1.0}{2013/09/01}
+%       {(Dario Buttari) Fix issues with \cs{marginheightadjustment} and
+%        \cs{extendmargin} not being applied and reset consistently.}
 %
 % \GetFileInfo{marginfix.dtx}
 % \title{\Lopt{marginfix} package documentation}
@@ -72,14 +80,16 @@
 % unsatisfying for short textual notes, and standard marginpars cannot
 % be mixed with sidebars.  This package implements a solution to
 % make marginpars "just work" by keeping a list of floating inserts and
-% arranging them intelligently in the output routine.
+% arranging them intelligently in the output routine.  The credit for the
+% concept behind this algorithm goes to Prof. Andy Ruina, who employed me
+% to work on some of his textbook macros in 2007--9.
 %
 % \section{Options}
 % There are currently no options that do anything yet.
 %
 % \section{Commands}
-% For the most part, this is a drop-in replacement.  Simply add
-% |\usepackage{marginfix}| to the preamble, use \cs{marginpar}
+% For the most part, this is a drop-in replacement.  Simply include
+% a call to |\usepackage{marginfix}| to the preamble, use \cs{marginpar}
 % normally and hope for the best.
 % In the event, however, that it doesn't work exactly as hoped,
 % there are a number of tweaks that the user can apply.
@@ -108,9 +118,9 @@
 %
 % \DescribeMacro{\mparshift}
 % To adjust the position of a single note, use \cs{mparshift}\marg{length}
-% before \cs{marginpar}.  Positive lengths move it down the page.  This
-% essentially shifts the call-out location, so the actual position of the
-% note might not change if the margin is sufficiently crowded.
+% before a call to \cs{marginpar}.  Positive lengths move it down the page.
+% This essentially shifts the call-out location, so the actual position of
+% the note might not change if the margin is sufficiently crowded.
 % Multiple calls before the same note are cumulative.
 %
 % \DescribeMacro{\marginheightadjustment}
@@ -122,11 +132,11 @@
 % \cs{extendmargin} on every page.
 %
 % \DescribeMacro{\marginposadjustment}
-% Similarly, if all the margins are in the wrong place, the callout
-% positions can be adjusted by assigning a non-zero value to the dimension
-% register \cs{marginposadjustment}.  This is effectively the same as a call
-% to \cs{mparshift} before every note.  This is particularly useful at
-% present because the height of the line on which the margin note is called
+% Similarly, if all the margin notes are in the wrong place, the callout
+% positions can be adjusted globally by assigning a non-zero value to the
+% dimension register \cs{marginposadjustment}.  This is effectively the same
+% as a call to \cs{mparshift} before every note.  This is particularly useful
+% at present because the height of the line on which the margin note is called
 % is currently only estimated, and appears to be off by a point or two.
 % This may get fixed in the future, but until then, the adjustment is
 % possibly the easiest workaround.
@@ -196,8 +206,8 @@
 %
 % The reader might begin to note at this point a convention we
 % adopt throughout this package.  While we strive to avoid introducing
-% new names as much as possible (using the \pkg{inlinedef} package
-% whenever we can), any new names we do introduce will be prefixed
+% new names as much as possible (with clever usages of \cs{expandafter}),
+% any new names we do introduce will be prefixed
 % by |\MFX@|, |\Mfx@|, or |\mfx@|, depending on the type of name.
 % The all-capitol |\MFX@| is used for fully-constant macros.  The
 % initial-caps |\Mfx@| is used for control sequences that are
@@ -372,7 +382,7 @@
 %   \@combinefloats
 %   add \@texttop and \@textbottom to \@outputbox (default no-op)
 % \@opcol:
-%   \@outputpage (of \@outputdblcol in twocolumn mode)
+%   \@outputpage (or \@outputdblcol in twocolumn mode)
 %   let \@mparbottom := \@textfloatsheight := 0
 %   \@floatplacement
 % \@startcolumn:
@@ -439,7 +449,7 @@
 %
 % \begin{macros}{\MFX@getypos,\mfx@ypos}
 % We now need to settle on a way to determine the vertical position.
-% Ultimately this will be an option, and will depend on a variety
+% Someday this may be an option, and will depend on a variety
 % of factors.  But for starters, we define the simplest version.
 % Note the subtraction of \cs{Mfx@strutheight}.  Ideally we would simply
 % grab a copy of \cs{@holdpg} from the middle of \cs{@specialoutput}
@@ -450,9 +460,9 @@
 % within \cs{@specialoutput}, and it's not worth the risky job of
 % performing surgery on it (which is unfortunately brittle if anyone
 % else has a similar idea), we instead resort to this approximation.
-% And since this will ultimately be only a fallback for when
-% \cs{pdflastypos} isn't available, it should be good enough.
-% NOTE: we might be able to use a \cs{vadjust} instead here?
+% And since this should ultimately be only a fallback for when
+% \cs{pdflastypos} isn't available, it's good enough.
+% (NOTE: we might be able to use a \cs{vadjust} instead here?)
 %    \begin{macrocode}
 \def\MFX@getypos{%
   \edef\mfx@ypos{%
@@ -490,9 +500,11 @@
 % 
 % \cs{MFX@combinefloats@before} is then responsible for picking the
 % needed notes from \cs{mfx@marginlist}, building them into a box, and
-% attaching said box onto the correct side of \cs{@outputbox}.  This is
-% also a convenient place to reset \cs{Mfx@marginheight} to zero (since
-% we reuse the register for one-time extensions).
+% attaching that box onto the correct side of \cs{@outputbox}.  We also
+% add any global \cs{marginheightadjustment} to \cs{Mfx@marginheight}
+% before building the margin, and then reset it back to zero at the end.
+% This allows any calls to \cs{extendmargin} during the page itself to
+% work as expected.
 %    \begin{macrocode}
 \def\MFX@combinefloats@before{%
   \advance\Mfx@marginheight\marginheightadjustment
@@ -546,7 +558,7 @@
 % When \cs{MFX@buildmargin} is called, we have a list of tokens in
 % \cs{mfx@marginlist} that need to be processed.  After it's done
 % working, \cs{mfx@marginlist} should have the first $n>0$ of these
-% removed, and leaving only notes that were deferred to the next
+% removed, leaving only notes that were deferred to the next
 % page.  Additionally, \cs{Mfx@marginbox} must contain a
 % box the same height as \cs{@outputbox}.  We do this in several
 % steps.  We start with a height of \cs{@colroom} rather than
@@ -571,8 +583,13 @@
 % and anything that will be deferred gets put back in
 % \cs{mfx@marginlist}.  This behavior is configured by changing
 % the meaning of \cs{mfx@margin@note}, \cs{mfx@margin@skip}, and
-% \cs{mfx@margin@clear}.  Note that during the course of processing
-% \cs{mfx@marginlist}, these meanings will continue to change.
+% \cs{mfx@margin@clear}, which delimit the different types of material
+% in \cs{mfx@marginlist}.  Note that during the course of processing
+% \cs{mfx@marginlist}, these meanings will continue to change (i.e.
+% once we've added a note, \cs{mfx@margin@skip} will be assigned to
+% actually do something, but it's initially empty because we gobble
+% any skips at page boundaries; similarly, once the margin is full,
+% the symbols are redefined to simply save themselves back to the list).
 %    \begin{macrocode}
 \def\MFX@buildmargin@down{%
 %<debug>\MFX@debug{buildmargin@down: ENTRY}%
@@ -631,10 +648,12 @@
   \advance\Mfx@marginboxspace\dimexpr\ht\@marbox+\dp\@marbox\relax
   \ifdim\Mfx@marginboxspace>\Mfx@marginheight
 %    \end{macrocode}
-% We've run out of margin space, so we now defer every following box,
-% which means appending them back to \cs{mfx@marginlist}, except with
+% We've run out of margin space (item 4, above), so we now defer every following
+% box, which means appending them back to \cs{mfx@marginlist}, except with
 % a callout position of zero, since we want them as high up as possible
-% (also, the position should be monotonic).
+% (also, the position should be monotonic).  We do this by calling
+% \cs{mfx@margin@clear} and then re-adding the note we were just looking
+% at.  We also need to subtract off the height that pushed us over the edge.
 %    \begin{macrocode}
 %<debug>\MFX@debug{note@down: out of space:
 %<debug>    \the\Mfx@marginboxspace>\the\Mfx@marginheight}%
@@ -643,8 +662,8 @@
     \mfx@margin@note#1#2{#3}%
   \else
 %    \end{macrocode}
-% At this point, the box is definitely going onto this page, so we can
-% arrange for the boxes to be freed and then add the correct box to the
+% At this point, the box is definitely going onto this page (item 5, above), so
+% we can arrange for the boxes to be freed and then add the correct box to the
 % output list.
 %    \begin{macrocode}
 %<debug>\MFX@debug{note@down: adding \@marbox 
@@ -724,7 +743,7 @@
 % would ideally allow \cs{if@reversemargin} to work on a per-note
 % basis (i.e. at callout time) but we also need something working at
 % shipout time so we can figure out which margin to use.  Thus, until
-% we figure out how to use multiple margins.
+% we figure out how to use multiple margins, this will have to do.
 %    \begin{macrocode}
 \def\MFX@leftmargin{%
   00\fi % close out the \if
