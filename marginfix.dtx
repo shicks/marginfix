@@ -495,9 +495,10 @@
 % we reuse the register for one-time extensions).
 %    \begin{macrocode}
 \def\MFX@combinefloats@before{%
+  \advance\Mfx@marginheight\marginheightadjustment
   \MFX@buildmargin
   \MFX@attachmargin
-  \Mfx@marginheight\marginheightadjustment
+  \global\Mfx@marginheight\z@
 }
 %    \end{macrocode}
 % \end{macros}
