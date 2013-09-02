@@ -6,7 +6,6 @@
 *.glo
 *.idx
 *~
-test*
 texput*
 web/
 \#*#

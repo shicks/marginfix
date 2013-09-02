@@ -1,0 +1,17 @@
+\documentclass{memoir}
+\usepackage{lipsum}
+\usepackage{marginfix}
+\usepackage{color}
+\marginparpush = 1cm
+\begin{document}
+ \textbf{The paragraph spacing should be stretched.}
+ \vfill
+ \marginpar{\lipsum[2]}
+ \vbox{\lipsum[1]}
+ \vfill
+ \vbox{\lipsum[1]}
+ \vfill
+ \vbox{\lipsum[1]}
+ \vfill
+ \vbox{\lipsum[1]}
+\end{document}

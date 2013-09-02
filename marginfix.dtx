@@ -61,6 +61,9 @@
 % \changes{v1.0}{2013/09/01}
 %       {(Dario Buttari) Fix issues with \cs{marginheightadjustment} and
 %        \cs{extendmargin} not being applied and reset consistently.}
+% \changes{v1.0}{2013/09/01}
+%       {(SDH) Stop gobbling vertical stretch on page.  Margin notes will
+%        not line up properly if page is stretched.}
 %
 % \GetFileInfo{marginfix.dtx}
 % \title{\Lopt{marginfix} package documentation}
@@ -165,6 +168,11 @@
 % \item Use of pdf\TeX's \cs{pdfsavepos} and \cs{pdflastypos} for more
 %   accurate margin placement.
 % \item \cs{vadjust} to correct inconsistencies with \cs{@pageht}.
+% \item Margin note placement is irrespective of vertical stretch.
+%   Previously we gobbled any vertical stretch, but now that we have
+%   fixed that bug, there's the possibility of wrong alignment since
+%   we don't know where the positions will ultimately end up.  This
+%   may be fixed by \cs{pdfsavepos} as well.
 % \item Better interaction with floats.
 %   (We can set a default one way
 %   or the other and then allow a macro to override it (presumably with a
@@ -541,15 +549,22 @@
 % the \cs{Mfx@marginbox} on.
 %    \begin{macrocode}
   \setbox\@outputbox\vbox to \ht\@outputbox{%
-    \hbox to \wd\@outputbox{%
-      \if\MFX@leftmargin
-        \llap{\box\Mfx@marginbox\hskip\marginparsep}%
-        \box\@outputbox
-      \else
-        \box\@outputbox
-        \rlap{\hskip\marginparsep\box\Mfx@marginbox}%
-      \fi
-  }}%
+    \begingroup
+    \setbox\@tempboxa\vbox to \ht\@outputbox{%
+      \hbox to \wd\@outputbox{%
+        \if\MFX@leftmargin
+          \llap{\box\Mfx@marginbox\hskip\marginparsep}%
+        \else
+          \hskip\wd\@outputbox
+          \rlap{\hskip\marginparsep\box\Mfx@marginbox}%
+        \fi
+      }}%
+    \ht\@tempboxa\z@
+    \dp\@tempboxa\z@
+    \box\@tempboxa
+    \endgroup
+    \unvbox\@outputbox
+  }%
 }
 %    \end{macrocode}
 % \end{macros}

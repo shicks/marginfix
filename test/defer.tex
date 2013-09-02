@@ -1,0 +1,17 @@
+\documentclass{memoir}
+\usepackage{lipsum}
+\usepackage{marginfix}
+\usepackage{color}
+\marginparpush = 1cm
+\begin{document}
+ \textbf{The margin notes on both pages should have a centimeter between them.}
+
+ \marginpar{\lipsum[2]}
+ \lipsum[1]
+ \marginpar{\color{red}\lipsum[2]}
+ \lipsum[1]
+ \marginpar{\lipsum[2]}
+ \lipsum[1]
+ \marginpar{\color{red}\lipsum[2]}
+ \lipsum[1]
+\end{document}
