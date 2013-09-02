@@ -1,0 +1,21 @@
+\documentclass{memoir}
+\usepackage{lipsum}
+\usepackage{marginfix}
+\usepackage{color}
+\marginparpush = 1cm
+
+\let\mp\marginpar
+\def\marginpar#1{\mp[{\raggedleft\scriptsize\sffamily L:#1}]{\raggedright\scriptsize\sffamily R:#1}}
+
+\begin{document}
+ \textbf{Ragged sides should be correct, as well as note alignment.}
+
+ [1]\marginpar{[1]\lipsum[2]}
+ \lipsum[1]
+ [2]\marginpar{[2]\color{red}\lipsum[2]}
+ \lipsum[1]
+ [3,4]\marginpar{[3]\lipsum[2]}\marginpar{[5]\lipsum[2]}
+ \lipsum[1]
+ [5]\marginpar{[5]\color{red}\lipsum[2]}
+ \lipsum[1]
+\end{document}
