@@ -1,11 +1,13 @@
-\documentclass{article}
-\usepackage{lipsum,marginfix}
+\documentclass{memoir}
+\usepackage{color,lipsum,marginfix}
 \advance\evensidemargin1in
 \advance\marginparwidth1in
 \advance\textwidth-1in
+\marginparpush = 1cm
 \begin{document}
 \begin{figure}[t]\hrule height 1in\caption{rule}\end{figure}
-\lipsum[1]\marginpar{\lipsum[1]}
-\lipsum[2]\marginpar{\lipsum[2]}
+\lipsum[1]\marginpar[{L: \lipsum[1-2]}]{R: \lipsum[1-2]}
+\lipsum[2]\marginpar[{L: \lipsum[2]}]{R: \lipsum[2]}
+\marginpar[{L: \color{red}\lipsum[2]}]{R: \color{red}\lipsum[2]}
 \lipsum[3-4]
 \end{document}
