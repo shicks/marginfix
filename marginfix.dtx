@@ -405,7 +405,7 @@
 %<debug>    \the\c@page:\the\@pageht, marginlist=\meaning\mfx@marginlist}%
   \MFX@getypos
   \MFX@cons\mfx@marginlist{% TODO: later this will be a run@marginlist
-    \noexpand\mfx@margin@note\@marbox\@currbox{\mfx@ypos}% (^i.e. for phantoms)
+    \noexpand\mfx@margin@note\@currbox\@marbox{\mfx@ypos}% (^i.e. for phantoms)
     \noexpand\mfx@margin@skip{\the\marginparpush}%
   }%
 %<debug>\MFX@debug{addmarginpar (exit): marginlist=\meaning\mfx@marginlist}%
