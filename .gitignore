@@ -4,6 +4,7 @@
 *.aux
 *.dvi
 *.glo
+*.out
 *.idx
 *~
 texput*

@@ -164,7 +164,7 @@
 % Here is a list of things to possibly look forward to in a future version.
 % If any of them are particularly important, please let me know.
 % \begin{itemize}
-% \item Margin phantoms.
+% \item Margin phantoms and/or \cs{blockmargin}
 % \item Use of pdf\TeX's \cs{pdfsavepos} and \cs{pdflastypos} for more
 %   accurate margin placement.
 % \item \cs{vadjust} to correct inconsistencies with \cs{@pageht}.
@@ -546,7 +546,13 @@
   \fi
 %    \end{macrocode}
 % Next we need to figure out which side of \cs{@outputbox} to attach
-% the \cs{Mfx@marginbox} on.
+% the \cs{Mfx@marginbox} on.  We now use \cs{columnwidth} instead of
+% \cs{wd}\cs{@outputbox} to set the right-hand margins, since tufte-\LaTeX
+% sometimes makes too-wide output boxes.  If this becomes a problem,
+% we'll need to consider making this configurable elsewhere.  We should
+% also pay attention to whether adding a box at the top of \cs{@outputbox}
+% might have unintended consequences w.r.t. any glue being retained that
+% should have been swallowed.  This will require further investigation.
 %    \begin{macrocode}
   \setbox\@outputbox\vbox to \ht\@outputbox{%
     \begingroup
@@ -555,7 +561,7 @@
         \if\MFX@leftmargin
           \llap{\box\Mfx@marginbox\hskip\marginparsep}%
         \else
-          \hskip\wd\@outputbox
+          \hskip\columnwidth
           \rlap{\hskip\marginparsep\box\Mfx@marginbox}%
         \fi
       }}%
