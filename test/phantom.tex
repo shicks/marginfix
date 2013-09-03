@@ -1,0 +1,19 @@
+\documentclass{memoir}
+\usepackage{lipsum}
+\usepackage{marginfix}
+\usepackage{color}
+\marginparpush = 1cm
+\begin{document}
+ \textbf{Depending on what else is around, the red note should be before or after the second paragraph, but never within.}
+
+ \marginpar{\scriptsize foo}%\lipsum[2]}
+ \lipsum[1]
+ \blockmargin
+ \lipsum[1]
+ \unblockmargin
+ \marginpar{\scriptsize\color{red}bar}
+ \lipsum[1]
+ \marginpar{\scriptsize\lipsum[2]}
+ \marginpar{\color{red}\lipsum[2]}
+ \lipsum[1]
+\end{document}

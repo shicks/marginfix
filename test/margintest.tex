@@ -5,9 +5,9 @@
 \advance\textwidth-1in
 \marginparpush = 1cm
 \begin{document}
-\begin{figure}[t]\hrule height 1in\caption{rule}\end{figure}
-\lipsum[1]\marginpar[{L: \lipsum[1-2]}]{R: \lipsum[1-2]}
-\lipsum[2]\marginpar[{L: \lipsum[2]}]{R: \lipsum[2]}
-\marginpar[{L: \color{red}\lipsum[2]}]{R: \color{red}\lipsum[2]}
-\lipsum[3-4]
+\begin{figure}[t]\hrule width 1in height 1in\caption{rule}\end{figure}%
+\lipsum[1]\leavevmode\marginpar[{L: \lipsum[2]}]{R: \lipsum[2]}%
+\lipsum[2]\marginpar[{L: \lipsum[1-2]}]{R: \lipsum[1-2]}%
+\marginpar[{L: \color{red}\lipsum[2]}]{R: \color{red}\lipsum[2]}%
+\lipsum[3-9]%
 \end{document}

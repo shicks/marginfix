@@ -4,14 +4,20 @@
 \usepackage{color}
 \marginparpush = 1cm
 \begin{document}
- \textbf{The margin notes on both pages should have a centimeter between them.}
+ \textbf{Margin notes should play nicely with large floats.}
 
- \marginpar{\lipsum[2]}%
- \lipsum[1]
- \marginpar{\color{red}\lipsum[2]}
- \lipsum[1]
  \marginpar{\lipsum[2]}
  \lipsum[1]
  \marginpar{\color{red}\lipsum[2]}
+ \marginpar{\color{blue}\lipsum[2]}
+ \marginpar{\color{red}\lipsum[2]}
+ \marginpar{\lipsum[2]}
  \lipsum[1]
+ \lipsum[1]
+ \marginpar{\color{red}\lipsum[2]}
+ \lipsum[1]
+ \begin{figure}[t]
+   \hrule width 10pc height 10pc
+ \end{figure}
+ \lipsum[2-6]
 \end{document}
