@@ -9,7 +9,7 @@ COPYRIGHT
   This program is provided under the terms of the LaTeX
   Project Public License distributed from CTAN archives at
     http://www.ctan.org/macros/latex/base/lppl.txt
-  Copyright 2010 Stephen D. Hicks
+  Copyright 2010, 2013 Stephen D. Hicks
 
 INSTALLATION
   Run `latex marginfix.ins' and copy the marginfix.sty file into a
