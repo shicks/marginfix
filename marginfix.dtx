@@ -15,7 +15,7 @@
            [2013/09/01 v1.0 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
-\CheckSum{806}
+\CheckSum{1197}
 %\OnlyDescription % (un)comment this line to show (hide) source code
 \RecordChanges
 \EnableCrossrefs
@@ -23,7 +23,7 @@
 \begin{document}
   \newcommand*\Lopt[1]{\textsf {#1}}
   \newcommand*\lit[1]{\texttt{\char`#1}} %% literal character (funny catcodes)
-  \parindent\z@
+  \parindent0pt
   \def\*#1{\texttt{\string#1}} %% sdh - |...| doesn't work in headings
   \makeatletter
   %
@@ -1092,6 +1092,7 @@
   \fi
 }
 %    \end{macrocode}
+% \end{macros}
 %
 % \subsection{Margin pieces}
 % \begin{macros}{\MFX@buildmargin@pieces,\MFX@buildmargin@piece}
@@ -1231,7 +1232,7 @@
 % case, we now need to check if any compressible space is needed above it.
 % In order to get better alignment for deferred notes, we check for the
 % case that the current position is zero and the note's callout position
-% is \cs{\MFX@minus@inf}.  In this case, we change the callout position
+% is \cs{MFX@minus@inf}.  In this case, we change the callout position
 % to instead be the greater of 0 or $\cs{topskip}-\cs{ht}\#1$.
 %    \begin{macrocode}
     \dimen@#2\relax
@@ -1314,6 +1315,7 @@
     \MFX@cons\mfx@marginout{\noexpand\mfx@build@skip{##1}{##2}}}%
 }
 %    \end{macrocode}
+% \end{macros}
 %
 % \subsection{Fourth pass: piecewise upward}
 % \begin{macros}{\MFX@buildpiece@up}
@@ -1361,7 +1363,7 @@
   \fi
 }
 %    \end{macrocode}
-% \end{macro}
+% \end{macros}
 %
 % \begin{macros}{\MFX@piece@note@up,\MFX@piece@skip@up}
 % Now that we've taken care of late deferrals, we can define the
