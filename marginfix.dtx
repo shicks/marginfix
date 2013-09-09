@@ -15,7 +15,7 @@
            [2013/09/08 v1.1 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
-\CheckSum{1197}
+\CheckSum{1158}
 %\OnlyDescription % (un)comment this line to show (hide) source code
 \RecordChanges
 \EnableCrossrefs
@@ -225,8 +225,7 @@
 % \begin{macros}{\MFX@debug}
 % We have some optionally-included code for debugging.  \cs{MFX@debug}
 % prints a new line followed by ``|MFX: |'' and then the message.
-% The newline can be suppressed with a |*|.  We'll also ask for more
-% error context in the debug mode.
+% We'll also ask for more error context in the debug mode.
 %    \begin{macrocode}
 %<*debug>
 \def\MFX@debug{\message{^^JMFX:}\message}
@@ -234,8 +233,6 @@
 \def\MFX@mac#1{\expandafter\MFX@@mac\meaning#1>>>}
 \def\MFX@@mac#1->{<<<}
 \def\MFX@htdp#1{\ht#1=\the\ht#1, \dp#1=\the\dp#1}
-\showboxbreadth=100
-\showboxdepth=10
 %</debug>
 %    \end{macrocode}
 % \end{macros}
@@ -511,7 +508,7 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@cons,\MFX@snoc,\MFX@run@clear}
+% \begin{macros}{\MFX@cons,\MFX@snoc}
 % In passing we'll define the cons macro, which fully-expands
 % its second argument, but makes sure to only expand the first
 % one once, so that any fragile control sequences in it are
@@ -533,6 +530,9 @@
   \expandafter\expandafter\expandafter{\expandafter\temp@#1}%
 }
 %    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\MFX@run@clear}
 % Finally, \cs{MFX@run@clear} is a quick trick to expand the
 % contents of a macro and then clear it (to \cs{@empty}) before
 % any of its tokens are consumed.
@@ -602,7 +602,7 @@
 % \end{macros}
 %
 % \section{Shipout-time patches}
-% \begin{macros}{\@combinefloats,\MFX@combinefloats@before}
+% \begin{macros}{\@combinefloats}
 % We need to patch in somewhere before \cs{@combinefloats} at the latest,
 % so that any heights calculated from \cs{@pageht} are correct---otherwise
 % the top figures will confuse us.  So we'll start by simply adding our
@@ -611,7 +611,9 @@
 \expandafter\def\expandafter\@combinefloats\expandafter{\expandafter
   \MFX@combinefloats@before\@combinefloats}
 %    \end{macrocode}
-% 
+% \end{macros}
+%
+% \begin{macros}{\MFX@combinefloats@before}
 % \cs{MFX@combinefloats@before} is then responsible for picking the
 % needed notes from \cs{mfx@marginlist}, building them into a box, and
 % attaching that box onto the correct side of \cs{@outputbox}.  We also
@@ -636,25 +638,11 @@
 \def\MFX@attachmargin{%
 %<debug>\MFX@debug{attachmargin}%
 %    \end{macrocode}
-% First, we need to make sure that the boxes we're combining are the
-% same size.
+% We start by moving the reference point of \cs{Mfx@marginbox} to the top.
 %    \begin{macrocode}
 %<debug>\MFX@debug{attachmargin: \MFX@htdp\@outputbox, \MFX@htdp\Mfx@marginbox}%
- %<debug>\showbox\@outputbox
- %<debug>\showbox\Mfx@marginbox
   \setbox\Mfx@marginbox\vtop{%
     \vskip\z@\unvbox\Mfx@marginbox}%
-  %% \ifdim\ht\@outputbox<\ht\Mfx@marginbox
-  %%   \setbox\Mfx@marginbox\vbox to \ht\@outputbox{%
-  %%     \unvbox\Mfx@marginbox
-  %%     \vskip\z@ shrink 1filll\relax
-  %%   }%
-  %% \else
-  %%   \setbox\Mfx@marginbox\vbox to \ht\@outputbox{%
-  %%     \unvbox\Mfx@marginbox
-  %%     \vfill
-  %%   }%
-  %% \fi
 %    \end{macrocode}
 % Next we need to figure out which side of \cs{@outputbox} to attach
 % the \cs{Mfx@marginbox} on.  We now use \cs{columnwidth} instead of
@@ -665,10 +653,10 @@
 % might have unintended consequences w.r.t. any glue being retained that
 % should have been swallowed.  This will require further investigation.
 %    \begin{macrocode}
-  \setbox\@outputbox\vbox{% to \ht\@outputbox{%
+  \setbox\@outputbox\vbox{%
     \begingroup
-    \setbox\@tempboxa\vbox{% to \ht\@outputbox{%
-      \hbox{% to \wd\@outputbox{%
+    \setbox\@tempboxa\vbox{%
+      \hbox{%
         \if\MFX@leftmargin
           \llap{\box\Mfx@marginbox\hskip\marginparsep}%
         \else
@@ -683,7 +671,6 @@
     \unskip
     \unvbox\@outputbox
   }%
- %<debug>\showbox\@outputbox
 }
 %    \end{macrocode}
 % \end{macros}
@@ -794,8 +781,6 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@margin@note@down,\MFX@margin@skip@down,
-%                \MFX@margin@clear@down}
 % We now define the various |\MFX@margin@...@down| macros.
 % At this stage in the game, the only difference between  notes
 % and skips is that we ignore skips before any notes by setting
@@ -808,6 +793,7 @@
 % \cs{mfx@pieceheights} and try again, until \cs{mfx@pieceheights}
 % is empty and we simply defer everything to later pages.
 %
+% \begin{macros}{\MFX@margin@note@down}
 % Upon seeing a note, we must do several things:
 % \begin{enumerate}
 % \item determine which box (left or right) is needed for the
@@ -836,7 +822,9 @@
   \fi
 }
 %    \end{macrocode}
+% \end{macros}
 %
+% \begin{macros}{\MFX@margin@skip@down}
 % Skips are similar.  A skip needs only to save itself back into
 % \cs{mfx@marginout}, provided it fits.  If not, there is no need
 % to defer it because it will just get gobbled at the top of the
@@ -851,7 +839,9 @@
   \fi
 }
 %    \end{macrocode}
+% \end{macros}
 %
+% \begin{macros}{\MFX@margin@clear@down}
 % Finally, \cs{MFX@margin@clear@down} is the only place we actually
 % need to handle full-margin clears, since the downward pass does not
 % ever push \cs{mfx@build@clear} onto \cs{mfx@marginout}.  When we
@@ -870,7 +860,7 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@check@fit,\MFX@popdimen}
+% \begin{macros}{\MFX@check@fit}
 % We factored out some of the common functionality between the
 % note and skip routines, so that must now be defined.  The
 % \cs{MFX@check@fit} macro acts as a conditional and should be
@@ -901,6 +891,8 @@
   \if@tempswa % start a new \if
 }
 %    \end{macrocode}
+% \end{macros}
+% \begin{macros}{\MFX@popdimen}
 % Here is a quick convenience routine.  \cs{MFX@popdimen}\marg{dimen}%
 % \marg{list} removes the first dimension from \emph{list} and stores
 % it into \emph{dimen}.
@@ -917,7 +909,7 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@whichbox,\MFX@leftmargin}
+% \begin{macros}{\MFX@whichbox}
 % We also need to determine which box should be used, since they
 % may have different heights.  The macro \cs{MFX@whichbox}%
 % \marg{target-box}\marg{left-box}\marg{right-box} checks which margin
@@ -933,7 +925,9 @@
 %<debug>\MFX@debug{whichbox: \@marbox (\the\dimexpr\ht#1+\dp#1)}%
 }
 %    \end{macrocode}
+% \end{macros}
 %
+% \begin{macros}{\MFX@leftmargin}
 % And here is the logic to figure out which margin were in, based
 % on the page number and other flags.  This is another conditional-like
 % macro, and should be used after an \cs{if}, as in
@@ -1022,7 +1016,7 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@margin@note@up,\MFX@margin@skip@up}
+% \begin{macros}{\MFX@margin@note@up}
 % We must again define the specific behavior of each build command.
 % These macros simply reuse \cs{MFX@check@fit}, but ask it to
 % decrement the piece counter when a piece runs out of space.
@@ -1055,6 +1049,9 @@
   \else\MFX@AssertionError\fi
 }
 %    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\MFX@margin@skip@up}
 % Skips are similar, but we have the added complication of handling
 % margin phantoms.  When we cross between phantom and piece, we split
 % the skip so that we can use the simplest recursion possible.
@@ -1095,7 +1092,7 @@
 % \end{macros}
 %
 % \subsection{Margin pieces}
-% \begin{macros}{\MFX@buildmargin@pieces,\MFX@buildmargin@piece}
+% \begin{macros}{\MFX@buildmargin@pieces}
 % Before we can start the third and fourth passes, we need to set up
 % a loop over the pieces so that each piece can do these passes at
 % one time.  In case we didn't use up all the pieces in the second
@@ -1117,7 +1114,9 @@
   \Mfx@piece@count\z@
 }
 %    \end{macrocode}
+% \end{macros}
 %
+% \begin{macros}{\MFX@buildmargin@piece}
 % The \cs{MFX@buildmargin@piece} macro is called for each piece of
 % the margin, and is passed the top and bottom positions of the piece.
 % Here we need to do a few things.  First, if the output so far is
@@ -1185,7 +1184,7 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@piece@note@down,\MFX@piece@skip@down,\MFX@piece@clear}
+% \begin{macros}{\MFX@piece@note@down}
 % We again define each of our building macros.  First, the note builder.
 % When we encounter a note, we first zero out \cs{Mfx@marginspace}.  Then
 % we need to decide whether to put it in the current piece, or whether
@@ -1261,7 +1260,9 @@
   \fi    
 }
 %    \end{macrocode}
+% \end{macros}
 %
+% \begin{macros}{\MFX@piece@skip@down}
 % Skips are a bit more complicated now.  We no longer gobble the
 % initial skips (since the skips at the top and bottom of the page
 % have already been eaten).  Instead, we need to look at
@@ -1301,7 +1302,9 @@
   \fi
 }
 %    \end{macrocode}
+% \end{macros}
 %
+% \begin{macros}{\MFX@piece@clear}
 % Finally, we need to handle the case of deferring material.  By
 % analogy with the previous two passes, we'll continue to refer to
 % this as clearing.  In this case, we need to redefine the note and
@@ -1365,7 +1368,7 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\MFX@piece@note@up,\MFX@piece@skip@up}
+% \begin{macros}{\MFX@piece@note@up}
 % Now that we've taken care of late deferrals, we can define the
 % standard behavior without worrying as much about that.
 % These macros finally set their contents into \cs{Mfx@piece@content},
@@ -1379,6 +1382,8 @@
   \let\mfx@build@skip\MFX@piece@skip@up
 }
 %    \end{macrocode}
+% \end{macros}
+% \begin{macros}{\MFX@piece@skip@up}
 % Skips are also straightforward.
 %    \begin{macrocode}
 \def\MFX@piece@skip@up#1#2{%
@@ -1451,13 +1456,15 @@
 %    \end{macrocode}
 % \end{macros}
 %
-% \begin{macros}{\clearmargin,\softclearmargin}
+% \begin{macros}{\clearmargin}
 % Likewise, \cs{clearmargin} is easy too.
 %    \begin{macrocode}
 \def\clearmargin{%
   \MFX@cons\mfx@marginlist{\noexpand\mfx@build@clear}%
 }
 %    \end{macrocode}
+% \end{macros}
+% \begin{macros}{\softclearmargin}
 % While we call \cs{softclearmargin} a ``clear margin'', it's
 % actually just a big \cs{marginskip}.  This allows us to stack
 % multiple copies without backing them all up.
