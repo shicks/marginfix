@@ -512,7 +512,7 @@
 % In passing we'll define the cons macro, which fully-expands
 % its second argument, but makes sure to only expand the first
 % one once, so that any fragile control sequences in it are
-% corectly protected.  We also define snoc, which prepends.
+% correctly protected.  We also define snoc, which prepends.
 % Note that we could put the \cs{temp@} definition into a group
 % if it was really gonna matter\ldots
 %    \begin{macrocode}
@@ -784,7 +784,7 @@
 % We now define the various |\MFX@margin@...@down| macros.
 % At this stage in the game, the only difference between  notes
 % and skips is that we ignore skips before any notes by setting
-% \cs{mfx@build@note} initially to \cs{@gobble}.  Once we've
+% \cs{mfx@build@skip} initially to \cs{@gobble}.  Once we've
 % seen the first note, skips are treated exactly the same: as
 % fixed-height material.  If there is room in the current piece
 % for the given height, then we prepend it to \cs{mfx@marginout},
@@ -928,7 +928,7 @@
 % \end{macros}
 %
 % \begin{macros}{\MFX@leftmargin}
-% And here is the logic to figure out which margin were in, based
+%   And here is the logic to figure out which margin we're in, based
 % on the page number and other flags.  This is another conditional-like
 % macro, and should be used after an \cs{if}, as in
 % \cs{if}\cs{MFX@leftmargin}\ldots\cs{else}\ldots\cs{fi}.
@@ -1039,7 +1039,7 @@
 % look for a piece that can fit this note, making sure to decrement
 % the piece count and pop off a phantom for each new piece we check.
 % Once it's found, we add the note back to \cs{mfx@marginout} with
-% the corect piece.
+% the correct piece.
 %    \begin{macrocode}
   \if\MFX@check@fit{\advance\Mfx@piece@count\m@ne
                     \MFX@popdimen\dimen@\mfx@phantomheights}{\ht#1+\dp#1}%
