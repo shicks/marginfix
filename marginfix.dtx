@@ -703,13 +703,13 @@
 % it for keeping track of available space in individual margin pieces.
 %    \begin{macrocode}
 \def\MFX@buildmargin{%
-  \advance\Mfx@marginheight\@colroom
+  \Mfx@marginheight=\@colroom
   \ifx\mfx@marginstart\relax
   \else
     \MFX@cons\mfx@marginpieces{%
       \noexpand\@elt{\mfx@marginstart}{\the\Mfx@marginheight}}%
     \gdef\mfx@marginstart{0pt}%
-    \global\advance\Mfx@piece@count\@ne
+    \global\Mfx@piece@count=\@ne
   \fi
 %<debug>\MFX@debug{buildmargin: marginheight=\the\Mfx@marginheight,
 %<debug>           marginlist=\MFX@mac\mfx@marginlist,
