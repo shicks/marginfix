@@ -10,9 +10,9 @@ marginfix.sty:marginfix.dtx marginfix.ins
 marginfix.pdf:marginfix.dtx
 	pdflatex marginfix.dtx
 
-.PHONY: test
+.PHONY: test clean
 
-test:margintest.pdf tufte.pdf ragged.pdf defer.pdf phantom.pdf float.pdf stretch.pdf
+test:margintest.pdf tufte.pdf ragged.pdf defer.pdf phantom.pdf float.pdf stretch.pdf issue-15.pdf
 
 margintest.pdf:marginfix.sty test/margintest.tex
 	pdflatex test/margintest.tex
@@ -34,3 +34,9 @@ float.pdf:marginfix.sty test/float.tex
 
 stretch.pdf:marginfix.sty test/stretch.tex
 	pdflatex test/stretch.tex
+
+issue-15.pdf:marginfix.sty test/issue-15.tex
+	pdflatex test/issue-15.tex
+
+clean:
+	rm *.log *.aux *.pdf tufte.out marginfix.sty
