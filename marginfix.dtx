@@ -12,10 +12,10 @@
 %
 %<package>\NeedsTeXFormat{LaTeX2e}
 %<package>\ProvidesPackage{marginfix}%
-           [2020/05/06 v1.2 Fix Margin Paragraphs]
+           [2025/05/10 v1.3 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
-\CheckSum{1159}
+%\CheckSum{1159}
 %\OnlyDescription % (un)comment this line to show (hide) source code
 \RecordChanges
 \EnableCrossrefs
@@ -73,6 +73,9 @@
 % \changes{v1.2}{2020/05/06}
 %       {(SDH) Fix long-standing bug where margin notes called out in
 %        the last few points of a page were being entirely dropped.}
+% \changes{v1.3}{2025/05/10}
+%       {(Daniel Bosk) Syncs up with \pkg{memoir} to to support non-outer 
+%       margins.}
 %
 % \GetFileInfo{marginfix.dtx}
 % \title{\Lopt{marginfix} package documentation}
@@ -945,6 +948,19 @@
 %    \begin{macrocode}
 \def\MFX@leftmargin{%
   00\fi % close out the \if
+  \@ifclassloaded{memoir}
+    {\memoir@MFX@leftmargin}
+    {\marginfix@MFX@leftmargin}
+%<debug>\MFX@debug{margin on \ifnum\@tempcnta<\z@ left\else right\fi}%
+  \ifnum\@tempcnta<\z@ % start a new \if
+}
+%    \end{macrocode}
+% \begin{macros}{\marginfix@MFX@leftmargin}
+% The \cs{marginfix@MFX@leftmargin} seems to be very similar to the original
+% code in the kernel.
+%    \begin{macrocode}
+\def\marginfix@MFX@leftmargin{%
+  \typeout{Running \marginfix@MFX@leftmargin}%
   \@tempcnta\@ne
   \if@mparswitch
     \unless\ifodd\c@page
@@ -954,11 +970,64 @@
   \if@reversemargin
     \@tempcnta-\@tempcnta
   \fi
-%<debug>\MFX@debug{margin on \ifnum\@tempcnta<\z@ left\else right\fi}%
-  \ifnum\@tempcnta<\z@ % start a new \if
 }
 %    \end{macrocode}
 % \end{macros}
+% \begin{macros}{\memoir@MFX@leftmargin}
+% The \cs{memoir@MFX@leftmargin} handles the case of two columns.
+% This can probably be incorporated in the non-\pkg{memoir} version of
+% the \pkg{marginfix} code too.
+%    \begin{macrocode}
+\def\memoir@MFX@leftmargin{%
+  \typeout{Running \memoir@MFX@leftmargin}%
+  \if@twocolumn
+    \if@firstcolumn \@tempcnta\m@ne \fi
+  \else
+    \memoir@MFX@leftmargin@singlecolumn
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{\memoir@MFX@leftmargin@singlecolumn}
+% The single column code of \pkg{memoir} has more action in it.
+%    \begin{macrocode}
+\def\memoir@MFX@leftmargin@singlecolumn{%
+%    \end{macrocode}
+% From the \pkg{memoir} source:
+% We make use of the fact that we have
+% hidden all the page checking in \verb?\m@mwhich@margin?, and we only
+% fire it off if we know \verb?\marginparmargin? have been used (via
+% \verb?\ifm@msetmp?). 
+%    \begin{macrocode}
+  \ifm@msetmp%
+    % \@tempcnta > 0 => right side of page
+    % \@tempcnta < 0 => left side of page
+    \m@mwhich@margin{\m@mmpar@margin}% set left or right margin
+    \ifmemtortm%
+      \@tempcnta\@ne\relax%
+    \else%
+      \@tempcnta\m@ne\relax%
+    \fi%
+  \else%
+    \if@mparswitch
+%    \end{macrocode}
+% The next line in the kernel version, reading \\
+% \verb?\ifodd\c@page \else\@tempcnta\m@ne \fi?, \\
+% is where the odd/even page checking is done in the kernel code.
+% \pkg{memoir} replaced it with its own code, and then continue with the kernel 
+% code---this fixes a bug that sometimes places a marginpar in the wrong
+% margin.
+%    \begin{macrocode}
+      \checkoddpage
+      \ifoddpage \else \@tempcnta\m@ne \fi%
+    \fi%
+    \if@reversemargin \@tempcnta -\@tempcnta \fi%
+  \fi%
+}
+%    \end{macrocode}
+% \end{macros}
+% \end{macros}
+% And that was the end of the \pkg{memoir} code.
 %
 % \begin{macros}{\MFX@minus@inf}
 % Finally, note that when deferring notes to the next page, we
