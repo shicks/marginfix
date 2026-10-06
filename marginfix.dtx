@@ -12,10 +12,10 @@
 %
 %<package>\NeedsTeXFormat{LaTeX2e}
 %<package>\ProvidesPackage{marginfix}%
-           [2020/05/06 v1.2 Fix Margin Paragraphs]
+           [2026/09/22 v1.4 Fix Margin Paragraphs]
 %<*driver>
 \documentclass{ltxdoc}
-\CheckSum{1159}
+\CheckSum{1352}
 %\OnlyDescription % (un)comment this line to show (hide) source code
 \RecordChanges
 \EnableCrossrefs
@@ -73,6 +73,15 @@
 % \changes{v1.2}{2020/05/06}
 %       {(SDH) Fix long-standing bug where margin notes called out in
 %        the last few points of a page were being entirely dropped.}
+% \changes{v1.3}{2026/06/23}
+%       {(Daniel Bosk) Keep each margin note on the page of its callout:
+%        record callout pages in the .aux and, on the next run, hold back
+%        notes that \LaTeX{} would otherwise set on the previous page.}
+% \changes{v1.4}{2026/09/22}
+%       {(Daniel Bosk) Hook into the kernel's \cs{@outputbox@attachfloats},
+%        so that notes are attached under the standard classes with
+%        \LaTeX{} 2020-10-01 or later (the kernel's first aid only did this
+%        for v1.2).}
 %
 % \GetFileInfo{marginfix.dtx}
 % \title{\Lopt{marginfix} package documentation}
@@ -95,6 +104,16 @@
 % arranging them intelligently in the output routine.  The credit for the
 % concept behind this algorithm goes to Prof.\ Andy Ruina, who employed me
 % to work on some of his textbook macros in 2007--9.
+%
+% As of v1.3 the package also keeps each note on the page of its callout.
+% A \cs{marginpar} is a float, so \LaTeX{} can attach it to the page it is
+% assembling even when the page then breaks \emph{before} the line that
+% called it---leaving a note whose mark is at the top of a page set in the
+% margin of the previous page.  marginfix now records each callout's page in
+% the \texttt{.aux} file and, on the next run, holds such a note back until
+% its own page is shipped (requesting a rerun through the usual ``Label(s)
+% may have changed'' mechanism).  This is automatic and needs no markup;
+% like cross-references it simply takes an extra pass to settle.
 %
 % \section{Options}
 % There are currently no options that do anything yet.
@@ -501,12 +520,45 @@
   \expandafter\ifx\@marbox\Mfx@inject@insert
     \mfx@injected\global\let\mfx@injected\@empty
   \else
-    \MFX@cons\mfx@marginlist{%
-      \noexpand\mfx@build@note\@currbox\@marbox{\mfx@ypos}%
-      \noexpand\mfx@build@skip{\the\marginparpush}%
-    }%
+    \global\advance\mfx@placeid\@ne
+    \mfx@maybe@defer
   \fi
 %<debug>\MFX@debug{addmarginpar (exit): marginlist=\MFX@mac\mfx@marginlist}%
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\mfx@maybe@defer,\mfx@place@now,\mfx@defer@note}
+% This is where ``keep notes on their anchor's page'' hooks in.  Every
+% real marginpar is given a sequential id (\cs{mfx@placeid}) matching the
+% id assigned at callout time (\cs{mfx@callid}); see \cs{mfx@anchorpage}.
+% If a previous run recorded the page of this note's anchor (its callout)
+% and that page lies \emph{after} the page we are currently shipping, then
+% \cs{marginpar} drifted backwards across a page break: instead of setting
+% the note here we hold it in \cs{mfx@deferred} until its anchor page comes
+% around (see \cs{mfx@release@deferred}).  With no recorded anchor (first
+% run, or a brand-new note) we behave exactly as before.
+%    \begin{macrocode}
+\def\mfx@maybe@defer{%
+  \@ifundefined{mfx@ap@\the\mfx@placeid}%
+    {\mfx@place@now}%
+    {\ifnum\@nameuse{mfx@ap@\the\mfx@placeid}>\c@page
+       \mfx@defer@note
+     \else
+       \mfx@place@now
+     \fi}%
+}
+\def\mfx@place@now{%
+  \MFX@cons\mfx@marginlist{%
+    \noexpand\mfx@build@note\@currbox\@marbox{\mfx@ypos}%
+    \noexpand\mfx@build@skip{\the\marginparpush}%
+  }%
+}
+\def\mfx@defer@note{%
+  \MFX@cons\mfx@deferred{%
+    \noexpand\mfx@deferred@note\@currbox\@marbox
+      {\@nameuse{mfx@ap@\the\mfx@placeid}}%
+  }%
 }
 %    \end{macrocode}
 % \end{macros}
@@ -557,7 +609,9 @@
     \expandafter\@elt\expandafter\Mfx@inject@insert
     \@freelist}%
   \expandafter\def\expandafter\mfx@injected\expandafter{\mfx@injected#1}%
+  \mfx@in@injecttrue
   \marginpar{}%
+  \mfx@in@injectfalse
 }
 %    \end{macrocode}
 % \end{macros}
@@ -599,7 +653,157 @@
 \newdimen\Mfx@strutheight
 \edef\marginpar{%
   \unexpanded{\setbox\@tempboxa\hbox{\strut}\Mfx@strutheight\ht\@tempboxa}%
+  \unexpanded{\mfx@marginpar@callout}%
   \expandafter\unexpanded\expandafter{\marginpar}%
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \section{Keeping notes on their anchor's page}
+% A \cs{marginpar} is a float, and \LaTeX{} can attach it to the page it is
+% busy assembling even when the page eventually breaks \emph{before} the line
+% that called it---so a note whose callout sits at the top of a page can be
+% set in the margin of the \emph{previous} page.  marginfix arranges notes
+% within whatever page \LaTeX{} hands them to it, and can push overflow
+% forwards, but on its own it has no notion of which page a note ``belongs''
+% to, so it cannot repair this backwards drift.
+%
+% We fix it across two passes.  Each real marginpar is numbered in document
+% order, and at callout time we record the page of that callout in the
+% \texttt{.aux} file with a deferred \cs{write} (the same trick \cs{label}
+% uses, so the page is captured at shipout).  On the next run that recorded
+% \emph{anchor page} lets \cs{@addmarginpar} recognise a note that would be
+% set too early and hold it back until its anchor page is shipped.  Because
+% marginfix attaches margin material only after the body column is built,
+% margin notes never move the body's page breaks, so anchor pages are stable
+% and the process converges---usually in a single extra pass, requested
+% through the kernel's own rerun machinery.
+%
+% \begin{macros}{\mfx@callid,\mfx@placeid,\ifmfx@in@inject,\mfx@deferred}
+% Two counters number the marginpars: \cs{mfx@callid} at callout time and
+% \cs{mfx@placeid} in the output routine.  They stay in lock-step because
+% every real marginpar passes through each exactly once, in the same order.
+% \cs{ifmfx@in@inject} is true only while \cs{MFX@inject} fakes a
+% \cs{marginpar} for its own bookkeeping, so those are skipped.
+% \cs{mfx@deferred} holds notes waiting for their anchor page.
+%    \begin{macrocode}
+\newcount\mfx@callid
+\newcount\mfx@placeid
+\newif\ifmfx@in@inject
+\let\mfx@deferred\@empty
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\mfx@cpage}
+% \cs{mfx@cpage} expands to the raw (arabic) page number.  When it is
+% \cs{let} to \cs{relax} inside \cs{protected@write} it survives the write's
+% \cs{edef} unexpanded and then expands at shipout, giving us the page the
+% callout actually landed on (regardless of any fancy \cs{thepage} format).
+%    \begin{macrocode}
+\def\mfx@cpage{\number\c@page}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\mfx@marginpar@callout}
+% Prepended to \cs{marginpar}, this numbers each real callout and records its
+% anchor page for the next run.
+%    \begin{macrocode}
+\def\mfx@marginpar@callout{%
+  \ifmfx@in@inject\else
+    \global\advance\mfx@callid\@ne
+    \if@filesw
+      \protected@write\@auxout{\let\mfx@cpage\relax}{%
+        \string\mfx@anchorpage{\the\mfx@callid}{\mfx@cpage}}%
+    \fi
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\mfx@anchorpage}
+% This is what the \texttt{.aux} file calls back.  Normally (while the file
+% is read at \cs{begin}\texttt{\{document\}}) it just stores the anchor page
+% keyed by id.  During the kernel's end-of-run consistency check the aux is
+% re-read with \cs{@newl@bel} \cs{let} to \cs{@testdef}; we detect that and,
+% if an anchor page is new or has changed, set \cs{@tempswa} so the kernel
+% issues its standard ``Label(s) may have changed.  Rerun'' warning---which
+% \texttt{latexmk} and friends already act on.
+%    \begin{macrocode}
+\def\mfx@anchorpage#1#2{%
+  \ifx\@newl@bel\@testdef
+    \@ifundefined{mfx@ap@#1}%
+      {\@tempswatrue}%
+      {\def\reserved@a{#2}%
+       \expandafter\ifx\csname mfx@ap@#1\endcsname\reserved@a\else
+         \@tempswatrue
+       \fi}%
+  \else
+    \global\@namedef{mfx@ap@#1}{#2}%
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\mfx@release@deferred,\mfx@release@one,\mfx@deferred@note}
+% Run at the start of every \cs{MFX@combinefloats@before}.  We walk the
+% deferred list: a note whose anchor page is still ahead of the page being
+% shipped stays deferred; one whose page has arrived is released by prepending
+% it to \cs{mfx@marginlist}, ahead of that page's own notes and at the top of
+% the text block (its callout drifted from near the page top), so marginfix's
+% normal building and stacking take over from there.  Released notes are
+% collected in order and prepended as a block so several notes landing on the
+% same page keep their document order.
+%    \begin{macrocode}
+\def\mfx@release@deferred{%
+  \ifx\mfx@deferred\@empty\else
+    \let\mfx@deferred@kept\@empty
+    \let\mfx@released\@empty
+    \let\mfx@deferred@note\mfx@release@one
+    \mfx@deferred
+    \global\let\mfx@deferred\mfx@deferred@kept
+    \ifx\mfx@released\@empty\else
+      \xdef\mfx@marginlist{%
+        \unexpanded\expandafter{\mfx@released}%
+        \unexpanded\expandafter{\mfx@marginlist}}%
+    \fi
+  \fi
+}
+\def\mfx@release@one#1#2#3{%
+  \ifnum#3>\c@page
+    \MFX@cons\mfx@deferred@kept{\noexpand\mfx@deferred@note#1#2{#3}}%
+  \else
+    \MFX@cons\mfx@released{%
+      \noexpand\mfx@build@note#1#2{0pt}%
+      \noexpand\mfx@build@skip{\the\marginparpush}}%
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+%
+% \begin{macros}{\mfx@flush@deferred,\mfx@flush@one}
+% A safety net: if a recorded anchor page is stale (e.g.\ the document shrank
+% since the run that wrote it) a deferred note's page might never come around.
+% \cs{dumpmargins} calls this at end of document to release everything that is
+% still waiting, so a note is never silently dropped---worst case it lands a
+% little late, exactly as an over-long note would today.
+%    \begin{macrocode}
+\def\mfx@flush@deferred{%
+  \ifx\mfx@deferred\@empty\else
+    \let\mfx@released\@empty
+    \let\mfx@deferred@note\mfx@flush@one
+    \mfx@deferred
+    \global\let\mfx@deferred\@empty
+    \ifx\mfx@released\@empty\else
+      \xdef\mfx@marginlist{%
+        \unexpanded\expandafter{\mfx@released}%
+        \unexpanded\expandafter{\mfx@marginlist}}%
+    \fi
+  \fi
+}
+\def\mfx@flush@one#1#2#3{%
+  \MFX@cons\mfx@released{%
+    \noexpand\mfx@build@note#1#2{0pt}%
+    \noexpand\mfx@build@skip{\the\marginparpush}}%
 }
 %    \end{macrocode}
 % \end{macros}
@@ -614,6 +818,19 @@
 \expandafter\def\expandafter\@combinefloats\expandafter{\expandafter
   \MFX@combinefloats@before\@combinefloats}
 %    \end{macrocode}
+% Since the 2020-10-01 release, the kernel's \cs{@makecol} no longer calls
+% \cs{@combinefloats} directly but through \cs{@outputbox@attachfloats},
+% which was \cs{let} to \cs{@combinefloats} before we patched it.  The
+% kernel's first-aid file repointed it for v1.2 of this package only, so we
+% must do it ourselves; otherwise our hook never runs under the standard
+% classes (\cs{memoir} has its own \cs{@makecol} that still calls
+% \cs{@combinefloats}), the notes are never attached, and the document ends
+% with ``Too many unprocessed floats'' and ``lost some margin notes''.
+%    \begin{macrocode}
+\ifdefined\@outputbox@attachfloats
+  \let\@outputbox@attachfloats\@combinefloats
+\fi
+%    \end{macrocode}
 % \end{macros}
 %
 % \begin{macros}{\MFX@combinefloats@before}
@@ -627,6 +844,7 @@
 %    \begin{macrocode}
 \def\MFX@combinefloats@before{%
   \advance\Mfx@marginheight\marginheightadjustment
+  \mfx@release@deferred
   \MFX@buildmargin
   \MFX@attachmargin
   \global\Mfx@marginheight\z@
@@ -1428,6 +1646,7 @@
 %    \begin{macrocode}
 \def\dumpmargins{%
 %<debug>\MFX@debug{dumpmargins}%
+  \mfx@flush@deferred
   \loop
   \unless\ifx\mfx@marginlist\@empty
 %<debug>\MFX@debug{dumpmargins: marginlist=\MFX@mac\mfx@marginlist}%

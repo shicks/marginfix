@@ -12,7 +12,7 @@ marginfix.pdf:marginfix.dtx
 
 .PHONY: test clean
 
-test:margintest.pdf tufte.pdf ragged.pdf defer.pdf phantom.pdf float.pdf stretch.pdf issue-15.pdf
+test:margintest.pdf tufte.pdf ragged.pdf defer.pdf phantom.pdf float.pdf stretch.pdf issue-15.pdf anchorpage.pdf
 
 margintest.pdf:marginfix.sty test/margintest.tex
 	pdflatex test/margintest.tex
@@ -37,6 +37,11 @@ stretch.pdf:marginfix.sty test/stretch.tex
 
 issue-15.pdf:marginfix.sty test/issue-15.tex
 	pdflatex test/issue-15.tex
+
+# Two passes: the first records anchor pages, the second fixes placement.
+anchorpage.pdf:marginfix.sty test/anchorpage.tex
+	pdflatex test/anchorpage.tex
+	pdflatex test/anchorpage.tex
 
 clean:
 	rm *.log *.aux *.pdf tufte.out marginfix.sty

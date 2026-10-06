@@ -1,0 +1,42 @@
+% Test for "keep notes on their anchor's page".
+%
+% A marginpar whose callout lands near the top of a page can be set in the
+% margin of the PREVIOUS page; the anchor-page machinery moves it back beside
+% its callout.  Whether the bug actually triggers is sensitive to exact
+% pagination, so this file is primarily an integrity/convergence check:
+%
+%   * anchor pages are recorded in the .aux on the first run;
+%   * the kernel's "Label(s) may have changed.  Rerun" warning fires once and
+%     then clears (i.e. the process converges) -- check the two .log files;
+%   * notes (including the cluster of three on one line) are neither lost nor
+%     overprinted.
+%
+% Needs two runs (first records, second corrects).  Build with latexmk, or
+% run pdflatex twice.  A real-world reproduction of the drift it fixes is the
+% margin citations in the DD2520 "appliedcrypto" course notes.
+\documentclass{article}
+\usepackage[a5paper,margin=18mm,marginparwidth=22mm]{geometry}
+\usepackage{marginfix}
+\usepackage{lipsum}
+\setlength{\marginparpush}{4pt}
+
+\newcounter{note}
+\newcommand{\note}{\stepcounter{note}%
+  \textsuperscript{\thenote}\marginpar{\footnotesize\thenote: note anchored
+    here -- it must sit on the SAME page as this number.}}
+
+\begin{document}
+% Fill most of page 1 so the next paragraph starts at the top of page 2.
+\lipsum[1-4]
+
+% These callouts should land near the top of page 2.  Three in one line
+% exercises stacking (they must not overprint).
+A clustered citation point\note{} with a second\note{} and a third\note{}
+right after it, all anchored at the top of the page.
+\lipsum[5-6]
+
+% A lone callout near a later page break.
+\lipsum[7-11]
+Another callout\note{} near a page boundary.
+\lipsum[12-13]
+\end{document}
